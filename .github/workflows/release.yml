@@ -67,6 +67,7 @@ jobs:
   update-repo:
     needs: release
     runs-on: ubuntu-latest
+    if: success()
     steps:
       - name: Checkout queryowl-updates repo
         uses: actions/checkout@v4
@@ -81,9 +82,24 @@ jobs:
           VERSION="${{ github.ref_name }}"
           echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
           
-          # Get release data from API
-          RELEASE_DATA=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ github.ref_name }}")
+          # Wait for release to be available (max 5 minutes)
+          for i in {1..30}; do
+            RELEASE_DATA=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ github.ref_name }}")
+            
+            if [ "$(echo "$RELEASE_DATA" | jq -r '.message // empty')" != "Not Found" ]; then
+              echo "Release found after $i attempts"
+              break
+            fi
+            
+            if [ $i -eq 30 ]; then
+              echo "Release not found after 30 attempts"
+              exit 1
+            fi
+            
+            echo "Waiting for release to be available (attempt $i/30)..."
+            sleep 10
+          done
           
           echo "$RELEASE_DATA" > release.json
 
