@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { check } from '@tauri-apps/plugin-updater';
-  import { relaunch } from '@tauri-apps/api/process';
+  import { relaunch } from '@tauri-apps/plugin-process';
 
   let updateState = $state('');
   let showNotification = $state(false);
@@ -15,15 +15,19 @@
 
   async function checkForUpdates() {
     try {
+      console.log('Checking for updates...');
       update = await check();
+      console.log('Update check result:', update);
       if (update?.available) {
         updateState = 'available';
         showNotification = true;
       }
     } catch (error) {
-      console.error('Failed to check for updates:', error);
+      console.error('Failed to check for updates - Full error:', error);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
       updateState = 'error';
-      errorMessage = 'Failed to check for updates';
+      errorMessage = error.message || 'Failed to check for updates';
       showNotification = true;
       startAutoHide();
     }
