@@ -137,21 +137,23 @@ jobs:
               name = asset['name']
               url = asset['browser_download_url']
               
-              if name.endswith('.tar.gz') and 'aarch64-apple-darwin' in name:
-                  platforms['darwin-aarch64'] = {'url': url}
-              elif name.endswith('.tar.gz') and 'x86_64-apple-darwin' in name:
-                  platforms['darwin-x86_64'] = {'url': url}
+              if name.endswith('.dmg'):
+                  if 'aarch64' in name:
+                      platforms['darwin-aarch64'] = {'url': url, 'signature': ''}
+                  elif 'x64' in name or 'x86_64' in name:
+                      platforms['darwin-x86_64'] = {'url': url, 'signature': ''}
               elif name.endswith('.AppImage'):
-                  platforms['linux-x86_64'] = {'url': url}
+                  platforms['linux-x86_64'] = {'url': url, 'signature': ''}
               elif name.endswith('.msi'):
-                  platforms['windows-x86_64'] = {'url': url}
+                  platforms['windows-x86_64'] = {'url': url, 'signature': ''}
               elif name.endswith('.sig'):
                   # Extract signature content if available
                   sig_platform = name.replace('.sig', '')
-                  if 'aarch64-apple-darwin' in sig_platform:
-                      signatures['darwin-aarch64'] = name
-                  elif 'x86_64-apple-darwin' in sig_platform:
-                      signatures['darwin-x86_64'] = name
+                  if 'dmg' in sig_platform:
+                      if 'aarch64' in sig_platform:
+                          signatures['darwin-aarch64'] = name
+                      elif 'x64' in sig_platform or 'x86_64' in sig_platform:
+                          signatures['darwin-x86_64'] = name
                   elif 'AppImage' in sig_platform:
                       signatures['linux-x86_64'] = name
                   elif 'msi' in sig_platform:
