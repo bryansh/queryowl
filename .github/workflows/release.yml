@@ -58,8 +58,13 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'QueryOwl v__VERSION__'
-          releaseBody: 'See the assets to download this version and install.'
-          releaseDraft: true
+          releaseBody: |
+            ## What's New
+            See the [changelog](https://github.com/bryansh/queryowl/compare/v__VERSION__...HEAD) for details.
+            
+            ## Installation
+            Download the appropriate installer for your platform below.
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
           updaterJsonPreferNsis: true
@@ -68,6 +73,8 @@ jobs:
     needs: release
     runs-on: ubuntu-latest
     if: success()
+    permissions:
+      contents: read
     steps:
       - name: Checkout queryowl-updates repo
         uses: actions/checkout@v4
