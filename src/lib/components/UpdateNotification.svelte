@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { check } from '@tauri-apps/plugin-updater';
   import { relaunch } from '@tauri-apps/plugin-process';
+  import { info, error, debug } from '@tauri-apps/plugin-log';
 
   let updateState = $state('');
   let showNotification = $state(false);
@@ -16,19 +17,21 @@
 
   async function checkForUpdates() {
     try {
-      console.log('Checking for updates...');
+      info('QueryOwl: Checking for updates...');
       update = await check();
-      console.log('Update check result:', update);
+      
       if (update?.available) {
+        info(`QueryOwl: Update available - version ${update.version}`);
         updateState = 'available';
         showNotification = true;
+      } else {
+        info('QueryOwl: No updates available');
       }
-    } catch (error) {
-      console.error('Failed to check for updates - Full error:', error);
-      console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
+    } catch (err) {
+      error(`QueryOwl: Failed to check for updates - ${err.message || err}`);
+      console.error('Failed to check for updates - Full error:', err);
       updateState = 'error';
-      errorMessage = error.message || 'Failed to check for updates';
+      errorMessage = err.message || 'Failed to check for updates';
       showNotification = true;
       startAutoHide();
     }
@@ -38,47 +41,47 @@
     if (!update) return;
 
     try {
-      console.log('Starting update installation...');
-      console.log('Update details:', {
-        version: update.version,
-        currentVersion: update.currentVersion,
-        body: update.body,
-        date: update.date
-      });
+      info(`QueryOwl: Starting update installation to version ${update.version}`);
+      debug(`QueryOwl: Update details - version: ${update.version}, current: ${update.currentVersion}`);
       
       updateState = 'installing';
       
-      console.log('Downloading and installing update...');
+      info('QueryOwl: Downloading and installing update...');
       await update.downloadAndInstall((event) => {
-        console.log('Download event:', event);
         if (event.event === 'Started') {
-          console.log('Download started, content length:', event.data.contentLength);
+          info(`QueryOwl: Download started, size: ${event.data.contentLength} bytes`);
         } else if (event.event === 'Progress') {
           downloadProgress = (event.data.chunkLength / event.data.contentLength) * 100;
-          console.log(`Download progress: ${downloadProgress.toFixed(2)}%`);
+          if (downloadProgress % 10 < 1) { // Log every 10%
+            info(`QueryOwl: Download progress: ${downloadProgress.toFixed(0)}%`);
+          }
         } else if (event.event === 'Finished') {
-          console.log('Download finished');
+          info('QueryOwl: Download completed, installing...');
         }
       });
       
-      console.log('Update installed successfully');
+      info('QueryOwl: Update installed successfully');
       updateState = 'complete';
       startAutoHide();
       
       // Auto-restart after 3 seconds
-      console.log('Restarting in 3 seconds...');
+      info('QueryOwl: Restarting application in 3 seconds...');
       setTimeout(() => {
-        console.log('Relaunching application...');
+        info('QueryOwl: Relaunching application...');
         relaunch();
       }, 3000);
-    } catch (error) {
-      console.error('Failed to install update - Full error:', error);
-      console.error('Error type:', error?.constructor?.name);
-      console.error('Error message:', error?.message);
-      console.error('Error stack:', error?.stack);
-      console.error('Error details:', JSON.stringify(error, null, 2));
+    } catch (err) {
+      error(`QueryOwl: Failed to install update - ${err.message || err}`);
+      error(`QueryOwl: Error type: ${err?.constructor?.name}`);
+      if (err?.stack) {
+        debug(`QueryOwl: Error stack: ${err.stack}`);
+      }
+      
+      // Keep console logs for immediate debugging
+      console.error('Failed to install update - Full error:', err);
+      
       updateState = 'error';
-      errorMessage = error?.message || 'Failed to install update';
+      errorMessage = err?.message || 'Failed to install update';
       showNotification = true;
       startAutoHide();
     }

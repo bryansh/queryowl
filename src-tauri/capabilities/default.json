@@ -6,7 +6,9 @@
   "permissions": [
     "core:default",
     "opener:default",
-    "updater:default",
-    "process:default"
+    "updater:default", 
+    "process:default",
+    "log:default",
+    "shell:default"
   ]
 }
