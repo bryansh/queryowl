@@ -50,11 +50,15 @@ jobs:
       - name: install frontend dependencies
         run: pnpm install
 
+      - name: Debug - List files before tauri-action
+        run: find src-tauri/target -name "*.sig" -o -name "*.tar.gz" 2>/dev/null || echo "No sig or tar.gz files found yet"
+
       - uses: tauri-apps/tauri-action@v0.5.23
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          RUST_LOG: debug
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'QueryOwl v__VERSION__'
@@ -69,6 +73,15 @@ jobs:
           args: ${{ matrix.args }}
           updaterJsonPreferNsis: true
 
+      - name: Debug - List all files after tauri-action
+        run: |
+          echo "=== Looking for .sig files ==="
+          find src-tauri/target -name "*.sig" 2>/dev/null || echo "No .sig files found"
+          echo "=== Looking for .tar.gz files ==="
+          find src-tauri/target -name "*.tar.gz" 2>/dev/null || echo "No .tar.gz files found"
+          echo "=== All bundle files ==="
+          find src-tauri/target -path "*/bundle/*" -type f 2>/dev/null || echo "No bundle files found"
+
   update-repo:
     needs: release
     runs-on: ubuntu-latest
@@ -82,6 +95,13 @@ jobs:
           repository: bryansh/queryowl-updates
           token: ${{ secrets.UPDATER_TOKEN }}
           path: updates-repo
+
+      - name: Debug - Check GitHub release assets
+        run: |
+          echo "=== Checking release assets for ${{ github.ref_name }} ==="
+          curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ github.ref_name }}" \
+            | jq '.assets[] | {name: .name, size: .size}'
 
       - name: Get release data
         id: release
