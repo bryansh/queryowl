@@ -137,7 +137,7 @@ jobs:
               name = asset['name']
               url = asset['browser_download_url']
               
-              if name.endswith('.dmg'):
+              if name.endswith('.app.tar.gz'):
                   if 'aarch64' in name:
                       platforms['darwin-aarch64'] = {'url': url, 'signature': ''}
                   elif 'x64' in name or 'x86_64' in name:

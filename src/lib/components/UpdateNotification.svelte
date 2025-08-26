@@ -8,6 +8,7 @@
   let update = $state(null);
   let errorMessage = $state('');
   let autoHideTimer = $state(null);
+  let downloadProgress = $state(0);
 
   onMount(() => {
     checkForUpdates();
@@ -37,19 +38,48 @@
     if (!update) return;
 
     try {
+      console.log('Starting update installation...');
+      console.log('Update details:', {
+        version: update.version,
+        currentVersion: update.currentVersion,
+        body: update.body,
+        date: update.date
+      });
+      
       updateState = 'installing';
-      await update.downloadAndInstall();
+      
+      console.log('Downloading and installing update...');
+      await update.downloadAndInstall((event) => {
+        console.log('Download event:', event);
+        if (event.event === 'Started') {
+          console.log('Download started, content length:', event.data.contentLength);
+        } else if (event.event === 'Progress') {
+          downloadProgress = (event.data.chunkLength / event.data.contentLength) * 100;
+          console.log(`Download progress: ${downloadProgress.toFixed(2)}%`);
+        } else if (event.event === 'Finished') {
+          console.log('Download finished');
+        }
+      });
+      
+      console.log('Update installed successfully');
       updateState = 'complete';
       startAutoHide();
       
       // Auto-restart after 3 seconds
+      console.log('Restarting in 3 seconds...');
       setTimeout(() => {
+        console.log('Relaunching application...');
         relaunch();
       }, 3000);
     } catch (error) {
-      console.error('Failed to install update:', error);
+      console.error('Failed to install update - Full error:', error);
+      console.error('Error type:', error?.constructor?.name);
+      console.error('Error message:', error?.message);
+      console.error('Error stack:', error?.stack);
+      console.error('Error details:', JSON.stringify(error, null, 2));
       updateState = 'error';
-      errorMessage = 'Failed to install update';
+      errorMessage = error?.message || 'Failed to install update';
+      showNotification = true;
       startAutoHide();
     }
   }
@@ -91,10 +121,14 @@
           {:else if updateState === 'installing'}
             <h3 class="text-sm font-medium text-gray-900 dark:text-white">📦 Installing Update</h3>
             <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-              Downloading and installing...
+              {#if downloadProgress > 0}
+                Downloading... {downloadProgress.toFixed(0)}%
+              {:else}
+                Preparing download...
+              {/if}
             </p>
-            <div class="mt-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div class="bg-blue-600 h-2 rounded-full animate-pulse w-1/2"></div>
+            <div class="mt-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+              <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: {downloadProgress}%"></div>
             </div>
           {:else if updateState === 'complete'}
             <h3 class="text-sm font-medium text-green-800 dark:text-green-400">✅ Update Complete</h3>
