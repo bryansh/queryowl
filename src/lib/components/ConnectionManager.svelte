@@ -4,12 +4,14 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Database, Plus, Trash2, TestTube, Loader2, AlertCircle, CheckCircle, Edit } from 'lucide-svelte';
 	import { connections, loadConnections, saveConnection, updateConnection, deleteConnection, testConnection, connectToDatabase } from '$lib/stores/connections';
-	import type { CreateConnectionRequest, UpdateConnectionRequest, TestConnectionRequest } from '$lib/types/database';
+	import type { CreateConnectionRequest, UpdateConnectionRequest, TestConnectionRequest, TestConnectionResponse } from '$lib/types/database';
+	import { invoke } from '@tauri-apps/api/core';
 
 	let showForm = $state(false);
 	let editingId = $state<string | null>(null);
 	let isLoading = $state(false);
 	let testResults = $state<Record<string, { success: boolean; error?: string }>>({});
+	let deleteConfirm = $state<{ show: boolean; id: string | null }>({ show: false, id: null });
 	
 	let formData = $state<CreateConnectionRequest>({
 		name: '',
@@ -52,30 +54,31 @@
 		}
 	}
 
-	async function handleDelete(id: string) {
-		if (confirm('Are you sure you want to delete this connection?')) {
+	function handleDelete(id: string) {
+		deleteConfirm = { show: true, id };
+	}
+	
+	async function confirmDelete() {
+		if (deleteConfirm.id) {
 			try {
-				await deleteConnection(id);
+				await deleteConnection(deleteConfirm.id);
 			} catch (error) {
 				console.error('Failed to delete connection:', error);
 			}
 		}
+		deleteConfirm = { show: false, id: null };
+	}
+	
+	function cancelDelete() {
+		deleteConfirm = { show: false, id: null };
 	}
 
 	async function handleTest(connection: any) {
-		const testReq: TestConnectionRequest = {
-			host: connection.host,
-			port: connection.port,
-			database: connection.database,
-			username: connection.username,
-			password: connection.password || '',
-			ssl: connection.ssl
-		};
-
 		testResults[connection.id] = { success: false };
 		
 		try {
-			const result = await testConnection(testReq);
+			// Use the new test_stored_connection command that handles encrypted passwords
+			const result = await invoke<TestConnectionResponse>('test_stored_connection', { connection });
 			testResults[connection.id] = result;
 		} catch (error) {
 			testResults[connection.id] = { success: false, error: String(error) };
@@ -97,7 +100,7 @@
 			port: connection.port,
 			database: connection.database,
 			username: connection.username,
-			password: connection.password || '',
+			password: '', // Clear password field for security - user must re-enter
 			ssl: connection.ssl || false
 		};
 		editingId = connection.id;
@@ -188,7 +191,7 @@
 						<Input 
 							bind:value={formData.password} 
 							type="password"
-							placeholder="••••••••"
+							placeholder={editingId ? "Enter password (required)" : "••••••••"}
 							required
 						/>
 					</div>
@@ -293,4 +296,24 @@
 			</div>
 		{/each}
 	</div>
+	
+	<!-- Delete Confirmation Dialog -->
+	{#if deleteConfirm.show}
+		<div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+			<div class="bg-card border rounded-lg p-6 max-w-md mx-4">
+				<h3 class="text-lg font-semibold text-foreground mb-4">Confirm Deletion</h3>
+				<p class="text-muted-foreground mb-6">
+					Are you sure you want to delete this connection? This action cannot be undone.
+				</p>
+				<div class="flex gap-3 justify-end">
+					<Button variant="outline" onclick={cancelDelete}>
+						Cancel
+					</Button>
+					<Button variant="destructive" onclick={confirmDelete}>
+						Delete Connection
+					</Button>
+				</div>
+			</div>
+		</div>
+	{/if}
 </div>

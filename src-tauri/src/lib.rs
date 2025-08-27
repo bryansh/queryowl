@@ -4,6 +4,8 @@ use std::sync::Mutex;
 use std::collections::HashMap;
 use uuid::Uuid;
 
+mod encryption;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct DatabaseConnection {
     id: String,
@@ -86,6 +88,9 @@ async fn save_connection(app: tauri::AppHandle, connection: CreateConnectionRequ
     let store = app.store_builder("connections.json").build()
         .map_err(|e| format!("Failed to build store: {}", e))?;
     
+    let encrypted_password = encryption::encrypt_password(&connection.password)
+        .map_err(|e| format!("Failed to encrypt password: {}", e))?;
+    
     let new_connection = DatabaseConnection {
         id: Uuid::new_v4().to_string(),
         name: connection.name,
@@ -93,7 +98,7 @@ async fn save_connection(app: tauri::AppHandle, connection: CreateConnectionRequ
         port: connection.port,
         database: connection.database,
         username: connection.username,
-        password: Some(connection.password),
+        password: Some(encrypted_password),
         ssl: connection.ssl,
         created_at: chrono::Utc::now().to_rfc3339(),
         last_connected: None,
@@ -153,12 +158,15 @@ async fn update_connection(app: tauri::AppHandle, connection: UpdateConnectionRe
     let mut updated_connection = None;
     for conn in &mut connections {
         if conn.id == connection.id {
+            let encrypted_password = encryption::encrypt_password(&connection.password)
+                .map_err(|e| format!("Failed to encrypt password: {}", e))?;
+            
             conn.name = connection.name;
             conn.host = connection.host;
             conn.port = connection.port;
             conn.database = connection.database;
             conn.username = connection.username;
-            conn.password = Some(connection.password);
+            conn.password = Some(encrypted_password);
             conn.ssl = connection.ssl;
             updated_connection = Some(conn.clone());
             break;
@@ -203,8 +211,63 @@ async fn test_database_connection(connection: TestConnectionRequest) -> Result<T
 }
 
 #[tauri::command]
+async fn test_stored_connection(connection: DatabaseConnection) -> Result<TestConnectionResponse, String> {
+    println!("Testing stored connection: {}", connection.name);
+    
+    // Decrypt password if it's encrypted
+    let password = match &connection.password {
+        Some(pwd) => {
+            println!("Password present, checking if encrypted...");
+            if encryption::is_encrypted(pwd) {
+                println!("Password is encrypted, decrypting...");
+                match encryption::decrypt_password(pwd) {
+                    Ok(decrypted) => {
+                        println!("Password decrypted successfully");
+                        decrypted
+                    },
+                    Err(e) => {
+                        println!("Failed to decrypt password: {}", e);
+                        return Err(format!("Failed to decrypt password: {}", e));
+                    }
+                }
+            } else {
+                println!("Password is not encrypted, using as-is");
+                pwd.clone()
+            }
+        },
+        None => String::new(),
+    };
+    
+    let ssl_mode = if connection.ssl.unwrap_or(false) { "require" } else { "disable" };
+    
+    let config = format!(
+        "host={} port={} dbname={} user={} password={} sslmode={}",
+        connection.host,
+        connection.port,
+        connection.database,
+        connection.username,
+        password,
+        ssl_mode
+    );
+    
+    match tokio_postgres::connect(&config, tokio_postgres::NoTls).await {
+        Ok(_) => Ok(TestConnectionResponse { success: true, error: None }),
+        Err(e) => Ok(TestConnectionResponse { 
+            success: false, 
+            error: Some(e.to_string()) 
+        })
+    }
+}
+
+#[tauri::command]
 async fn connect_to_database(connection: DatabaseConnection) -> Result<(), String> {
-    let password = connection.password.as_deref().unwrap_or("");
+    let password = match &connection.password {
+        Some(encrypted) if encryption::is_encrypted(encrypted) => {
+            encryption::decrypt_password(encrypted)?
+        },
+        Some(plain) => plain.clone(),
+        None => String::new(),
+    };
     let ssl_mode = if connection.ssl.unwrap_or(false) { "require" } else { "disable" };
     
     let config = format!(
@@ -312,7 +375,13 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_sql::Builder::new().build())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
+            // Initialize encryption
+            encryption::initialize_encryption(&app.handle())?;
+            // Migrate existing unencrypted passwords
+            encryption::migrate_existing_connections(&app.handle())?;
+            
             // Create menu items
             let about = MenuItemBuilder::new("About QueryOwl").id("about").build(app)?;
             let quit = MenuItemBuilder::new("Quit QueryOwl")
@@ -328,27 +397,15 @@ pub fn run() {
                 .accelerator("CmdOrCtrl+Shift+P")
                 .build(app)?;
             
-            // Native clipboard menu items (should fix Cmd+V issue)
-            let copy = MenuItemBuilder::new("Copy")
-                .id("copy")
-                .accelerator("CmdOrCtrl+C")
-                .build(app)?;
-            let paste = MenuItemBuilder::new("Paste")
-                .id("paste") 
-                .accelerator("CmdOrCtrl+V")
-                .build(app)?;
-            let cut = MenuItemBuilder::new("Cut")
-                .id("cut")
-                .accelerator("CmdOrCtrl+X") 
-                .build(app)?;
-            let select_all = MenuItemBuilder::new("Select All")
-                .id("select_all")
-                .accelerator("CmdOrCtrl+A")
-                .build(app)?;
-            
-            // Create submenus
+            // Create Edit menu using Tauri's predefined items
             let edit_submenu = SubmenuBuilder::new(app, "Edit")
-                .items(&[&cut, &copy, &paste, &select_all])
+                .undo()
+                .redo()
+                .separator()
+                .cut()
+                .copy()
+                .paste()
+                .select_all()
                 .build()?;
                 
             let debug_submenu = SubmenuBuilder::new(app, "Debug")
@@ -376,6 +433,7 @@ pub fn run() {
             update_connection,
             delete_connection,
             test_database_connection,
+            test_stored_connection,
             connect_to_database,
             disconnect_from_database,
             update_last_connected
@@ -407,9 +465,6 @@ pub fn run() {
                             }
                         }
                     });
-                },
-                "copy" | "cut" | "paste" | "select_all" => {
-                    // Native clipboard operations work automatically with proper CSP
                 },
                 "about" => {
                     #[cfg(target_os = "macos")]
