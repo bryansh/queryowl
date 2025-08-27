@@ -2,17 +2,19 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
-  import { Database, Settings } from "lucide-svelte";
+  import { Database, Settings, FileText } from "lucide-svelte";
   import Button from "$lib/components/ui/button/button.svelte";
   import Input from "$lib/components/ui/input/input.svelte";
   import ConnectionManager from "$lib/components/ConnectionManager.svelte";
   import ConnectionStatus from "$lib/components/ConnectionStatus.svelte";
   import UpdateNotification from "$lib/components/UpdateNotification.svelte";
   import DebugShortcuts from "$lib/components/DebugShortcuts.svelte";
+  import QueryInterface from "$lib/components/QueryInterface.svelte";
+  import { connections, activeConnection } from '$lib/stores/connections';
 
   let name = $state("");
   let greetMsg = $state("");
-  let currentView = $state("home"); // "home", "connections"
+  let currentView = $state("home"); // "home", "connections", "query"
   let showLogPath = $state(false);
   let logPath = $state("");
 
@@ -67,6 +69,16 @@
               <Database class="h-4 w-4 mr-2" />
               Connections
             </Button>
+            <Button 
+              variant={currentView === "query" ? "default" : "ghost"}
+              size="sm"
+              onclick={() => currentView = "query"}
+              disabled={!$activeConnection}
+              title={!$activeConnection ? "Connect to a database first" : "Run SQL queries"}
+            >
+              <FileText class="h-4 w-4 mr-2" />
+              Query
+            </Button>
           </nav>
         </div>
         <div class="flex items-center gap-4">
@@ -111,11 +123,14 @@
             <Button 
               variant="outline"
               class="h-20 flex-col"
-              disabled
+              onclick={() => currentView = "query"}
+              disabled={!$activeConnection}
             >
-              <Settings class="h-6 w-6 mb-2" />
+              <FileText class="h-6 w-6 mb-2" />
               Run Queries
-              <span class="text-xs text-muted-foreground mt-1">Coming Soon</span>
+              {#if !$activeConnection}
+                <span class="text-xs text-muted-foreground mt-1">Connect to database first</span>
+              {/if}
             </Button>
           </div>
         </div>
@@ -144,6 +159,8 @@
       </div>
     {:else if currentView === "connections"}
       <ConnectionManager />
+    {:else if currentView === "query"}
+      <QueryInterface activeConnection={$activeConnection} />
     {/if}
   </main>
 </div>

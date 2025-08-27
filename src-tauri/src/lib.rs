@@ -1,4 +1,5 @@
 use tauri::{Manager, Emitter, menu::*};
+use tauri_plugin_store::StoreExt;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use std::collections::HashMap;
@@ -260,6 +261,94 @@ async fn test_stored_connection(connection: DatabaseConnection) -> Result<TestCo
 }
 
 #[tauri::command]
+async fn execute_query(app: tauri::AppHandle, connection_id: String, sql: String) -> Result<Vec<serde_json::Value>, String> {
+    println!("Executing query for connection: {}", connection_id);
+    println!("SQL: {}", sql);
+    
+    // Load connections from store to get the connection details
+    let store = app.store_builder("connections.json").build()
+        .map_err(|e| format!("Failed to build store: {}", e))?;
+    
+    let connections: Vec<DatabaseConnection> = store.get("connections")
+        .and_then(|value| serde_json::from_value(value).ok())
+        .unwrap_or_default();
+    
+    let connection = connections.iter()
+        .find(|c| c.id == connection_id)
+        .ok_or("Connection not found")?;
+    
+    // Decrypt password if it's encrypted
+    let password = match &connection.password {
+        Some(encrypted) if encryption::is_encrypted(encrypted) => {
+            encryption::decrypt_password(encrypted)?
+        },
+        Some(plain) => plain.clone(),
+        None => String::new(),
+    };
+    
+    let ssl_mode = if connection.ssl.unwrap_or(false) { "require" } else { "disable" };
+    
+    let config = format!(
+        "host={} port={} dbname={} user={} password={} sslmode={}",
+        connection.host,
+        connection.port,
+        connection.database,
+        connection.username,
+        password,
+        ssl_mode
+    );
+    
+    // Connect and execute query
+    let (client, conn) = tokio_postgres::connect(&config, tokio_postgres::NoTls).await
+        .map_err(|e| format!("Connection failed: {}", e))?;
+    
+    // Spawn connection handler
+    tokio::spawn(async move {
+        if let Err(e) = conn.await {
+            eprintln!("Connection error: {}", e);
+        }
+    });
+    
+    // Execute the query
+    let rows = client.query(&sql, &[]).await
+        .map_err(|e| format!("Query execution failed: {}", e))?;
+    
+    // Convert rows to JSON - simplified approach
+    let mut results = Vec::new();
+    for row in rows {
+        let mut row_map = serde_json::Map::new();
+        
+        for (i, column) in row.columns().iter().enumerate() {
+            let column_name = column.name();
+            
+            // Try to get the value as different types, falling back to string
+            let value = if let Ok(v) = row.try_get::<_, Option<bool>>(i) {
+                v.map(serde_json::Value::Bool).unwrap_or(serde_json::Value::Null)
+            } else if let Ok(v) = row.try_get::<_, Option<i32>>(i) {
+                v.map(|n| serde_json::Value::Number(n.into())).unwrap_or(serde_json::Value::Null)
+            } else if let Ok(v) = row.try_get::<_, Option<i64>>(i) {
+                v.map(|n| serde_json::Value::Number(n.into())).unwrap_or(serde_json::Value::Null)
+            } else if let Ok(v) = row.try_get::<_, Option<f64>>(i) {
+                v.and_then(|n| serde_json::Number::from_f64(n))
+                 .map(serde_json::Value::Number)
+                 .unwrap_or(serde_json::Value::Null)
+            } else if let Ok(v) = row.try_get::<_, Option<String>>(i) {
+                v.map(serde_json::Value::String).unwrap_or(serde_json::Value::Null)
+            } else {
+                // For any other type, fallback to null (we can enhance this later)
+                serde_json::Value::Null
+            };
+            
+            row_map.insert(column_name.to_string(), value);
+        }
+        
+        results.push(serde_json::Value::Object(row_map));
+    }
+    
+    Ok(results)
+}
+
+#[tauri::command]
 async fn connect_to_database(connection: DatabaseConnection) -> Result<(), String> {
     let password = match &connection.password {
         Some(encrypted) if encryption::is_encrypted(encrypted) => {
@@ -434,6 +523,7 @@ pub fn run() {
             delete_connection,
             test_database_connection,
             test_stored_connection,
+            execute_query,
             connect_to_database,
             disconnect_from_database,
             update_last_connected
