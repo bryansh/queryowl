@@ -108,7 +108,7 @@ jobs:
           }
           Write-Host "=== All bundle files ==="
           if (Test-Path "src-tauri/target") {
-            $bundleFiles = Get-ChildItem -Path "src-tauri/target" -Recurse -Path "*bundle*" -ErrorAction SilentlyContinue
+            $bundleFiles = Get-ChildItem -Path "src-tauri/target" -Recurse | Where-Object { $_.FullName -like "*bundle*" } -ErrorAction SilentlyContinue
             if ($bundleFiles) { $bundleFiles | ForEach-Object { $_.FullName } } else { Write-Host "No bundle files found" }
           }
 
