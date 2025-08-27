@@ -328,7 +328,29 @@ pub fn run() {
                 .accelerator("CmdOrCtrl+Shift+P")
                 .build(app)?;
             
+            // Native clipboard menu items (should fix Cmd+V issue)
+            let copy = MenuItemBuilder::new("Copy")
+                .id("copy")
+                .accelerator("CmdOrCtrl+C")
+                .build(app)?;
+            let paste = MenuItemBuilder::new("Paste")
+                .id("paste") 
+                .accelerator("CmdOrCtrl+V")
+                .build(app)?;
+            let cut = MenuItemBuilder::new("Cut")
+                .id("cut")
+                .accelerator("CmdOrCtrl+X") 
+                .build(app)?;
+            let select_all = MenuItemBuilder::new("Select All")
+                .id("select_all")
+                .accelerator("CmdOrCtrl+A")
+                .build(app)?;
+            
             // Create submenus
+            let edit_submenu = SubmenuBuilder::new(app, "Edit")
+                .items(&[&cut, &copy, &paste, &select_all])
+                .build()?;
+                
             let debug_submenu = SubmenuBuilder::new(app, "Debug")
                 .items(&[&open_logs, &show_path])
                 .build()?;
@@ -339,7 +361,7 @@ pub fn run() {
             
             // Create main menu
             let menu = MenuBuilder::new(app)
-                .items(&[&app_submenu, &debug_submenu])
+                .items(&[&app_submenu, &edit_submenu, &debug_submenu])
                 .build()?;
 
             app.set_menu(menu)?;
@@ -385,6 +407,9 @@ pub fn run() {
                             }
                         }
                     });
+                },
+                "copy" | "cut" | "paste" | "select_all" => {
+                    // Native clipboard operations work automatically with proper CSP
                 },
                 "about" => {
                     #[cfg(target_os = "macos")]
