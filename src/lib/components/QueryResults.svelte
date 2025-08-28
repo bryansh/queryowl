@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
 	import { Download, Copy, CheckCircle, AlertCircle, Table } from 'lucide-svelte';
 	
 	let { 
@@ -110,9 +109,8 @@
 				{/if}
 			</div>
 			<div class="flex items-center gap-2">
-				<Button 
-					size="sm" 
-					variant="outline"
+				<button 
+					class="btn btn-sm btn-outline"
 					onclick={copyToClipboard}
 				>
 					{#if copied}
@@ -122,15 +120,14 @@
 						<Copy class="h-4 w-4 mr-2" />
 						Copy
 					{/if}
-				</Button>
-				<Button 
-					size="sm" 
-					variant="outline"
+				</button>
+				<button 
+					class="btn btn-sm btn-outline"
 					onclick={downloadCsv}
 				>
 					<Download class="h-4 w-4 mr-2" />
 					Export CSV
-				</Button>
+				</button>
 			</div>
 		</div>
 		

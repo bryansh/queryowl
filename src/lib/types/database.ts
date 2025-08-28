@@ -9,6 +9,7 @@ export interface DatabaseConnection {
 	ssl?: boolean;
 	createdAt: string;
 	lastConnected?: string;
+	color?: string;
 }
 
 export interface ConnectionStatus {
@@ -25,6 +26,7 @@ export interface CreateConnectionRequest {
 	username: string;
 	password: string;
 	ssl?: boolean;
+	color?: string;
 }
 
 export interface UpdateConnectionRequest {
@@ -36,6 +38,7 @@ export interface UpdateConnectionRequest {
 	username: string;
 	password: string;
 	ssl?: boolean;
+	color?: string;
 }
 
 export interface TestConnectionRequest {

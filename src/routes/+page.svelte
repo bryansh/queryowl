@@ -3,12 +3,9 @@
   import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
   import { Database, Settings, FileText } from "lucide-svelte";
-  import Button from "$lib/components/ui/button/button.svelte";
-  import Input from "$lib/components/ui/input/input.svelte";
   import ConnectionManager from "$lib/components/ConnectionManager.svelte";
   import ConnectionStatus from "$lib/components/ConnectionStatus.svelte";
   import UpdateNotification from "$lib/components/UpdateNotification.svelte";
-  import DebugShortcuts from "$lib/components/DebugShortcuts.svelte";
   import QueryInterface from "$lib/components/QueryInterface.svelte";
   import { connections, activeConnection } from '$lib/stores/connections';
 
@@ -41,120 +38,98 @@
   }
 </script>
 
-<div class="min-h-screen bg-background">
+<div class="w-full h-full bg-background flex overflow-hidden">
   <UpdateNotification />
-  <DebugShortcuts />
   
-  <!-- Header with navigation and connection status -->
-  <header class="border-b bg-card">
-    <div class="max-w-7xl mx-auto px-4 py-4">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-6">
-          <h1 class="text-xl font-semibold text-foreground flex items-center gap-2">
-            🦉 QueryOwl
-          </h1>
-          <nav class="flex items-center gap-4">
-            <Button 
-              variant={currentView === "home" ? "default" : "ghost"}
-              size="sm"
-              onclick={() => currentView = "home"}
-            >
-              Home
-            </Button>
-            <Button 
-              variant={currentView === "connections" ? "default" : "ghost"}
-              size="sm"
-              onclick={() => currentView = "connections"}
-            >
-              <Database class="h-4 w-4 mr-2" />
-              Connections
-            </Button>
-            <Button 
-              variant={currentView === "query" ? "default" : "ghost"}
-              size="sm"
-              onclick={() => currentView = "query"}
-              disabled={!$activeConnection}
-              title={!$activeConnection ? "Connect to a database first" : "Run SQL queries"}
-            >
-              <FileText class="h-4 w-4 mr-2" />
-              Query
-            </Button>
-          </nav>
-        </div>
-        <div class="flex items-center gap-4">
-          <ConnectionStatus />
-        </div>
-      </div>
+  <!-- Sidebar like Beekeeper Studio -->
+  <aside class="beekeeper-sidebar w-64 flex flex-col m-3 mr-1 rounded-lg">
+    <!-- Sidebar Header -->
+    <div class="px-4 py-6 border-b border-slate-600">
+      <h1 class="text-lg font-semibold text-white flex items-center gap-2">
+        🦉 QueryOwl
+      </h1>
     </div>
-  </header>
+    
+    <!-- Navigation -->
+    <nav class="flex-1 p-4">
+      <div class="space-y-2">
+        <button
+          class="w-full text-left px-4 py-3 rounded-lg text-sm transition-colors {currentView === 'connections' ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-slate-600 text-slate-300'}"
+          onclick={() => currentView = "connections"}
+        >
+          <Database class="h-4 w-4 mr-3 inline" />
+          Connections
+        </button>
+        <button
+          class="w-full text-left px-4 py-3 rounded-lg text-sm transition-colors {currentView === 'query' ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-slate-600 text-slate-300'} {!$activeConnection ? 'opacity-50 cursor-not-allowed' : ''}"
+          onclick={() => currentView = "query"}
+          disabled={!$activeConnection}
+          title={!$activeConnection ? "Connect to a database first" : "Run SQL queries"}
+        >
+          <FileText class="h-4 w-4 mr-3 inline" />
+          Query Editor
+        </button>
+      </div>
+      
+      <!-- Connection Status in Sidebar -->
+      <div class="mt-8 p-4 bg-slate-700 rounded-lg border border-slate-600">
+        <ConnectionStatus />
+      </div>
+    </nav>
+  </aside>
 
-  <!-- Main content -->
-  <main class="max-w-7xl mx-auto px-4 py-8">
+  <!-- Main content area -->
+  <div class="flex-1 flex flex-col min-h-0 m-3 ml-1 rounded-lg overflow-hidden">
+    <!-- Top toolbar -->
+    <header class="flex-shrink-0 bg-slate-800 flex items-center justify-between px-6 py-4 border-b border-slate-600">
+      <div class="flex items-center gap-4">
+        {#if currentView === "query" && $activeConnection}
+          <span class="text-sm text-slate-300 font-medium">
+            {$activeConnection.name} • {$activeConnection.database}
+          </span>
+        {:else if currentView === "connections"}
+          <span class="text-sm text-slate-300 font-medium">Manage Connections</span>
+        {:else}
+          <span class="text-sm text-slate-300 font-medium">Welcome to QueryOwl</span>
+        {/if}
+      </div>
+      <div class="flex items-center gap-2">
+        <!-- Add any toolbar actions here if needed -->
+      </div>
+    </header>
+
+    <!-- Main content -->
+    <main class="flex-1 p-6 overflow-hidden min-h-0 bg-slate-900">
     {#if currentView === "home"}
-      <div class="max-w-2xl mx-auto space-y-8 text-center">
-        <div class="space-y-4">
-          <h2 class="text-3xl font-bold text-foreground">
-            Welcome to QueryOwl 🦉
-          </h2>
-          <p class="text-lg text-muted-foreground">
-            A powerful PostgreSQL database query tool built with Tauri and Svelte 5
-          </p>
-        </div>
-
-        <div class="flex justify-center space-x-4">
-          <a href="https://tauri.app" target="_blank" class="p-4 rounded-lg hover:bg-accent transition-colors">
-            <img src="/tauri.svg" class="h-16 w-16" alt="Tauri Logo" />
-          </a>
-          <a href="https://svelte.dev" target="_blank" class="p-4 rounded-lg hover:bg-accent transition-colors">
-            <img src="/svelte.svg" class="h-16 w-16" alt="Svelte Logo" />
-          </a>
-        </div>
-        
-        <div class="space-y-4">
-          <h3 class="text-xl font-semibold text-foreground">Get Started</h3>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-lg mx-auto">
-            <Button 
+      <div class="flex-1 flex items-center justify-center">
+        <div class="max-w-md text-center space-y-8">
+          <div class="space-y-4">
+            <div class="text-6xl mb-4">🦉</div>
+            <h2 class="text-2xl font-bold text-slate-200">
+              Welcome to QueryOwl
+            </h2>
+            <p class="text-slate-400">
+              A powerful PostgreSQL database query tool
+            </p>
+          </div>
+          
+          <div class="space-y-3">
+            <button 
               onclick={() => currentView = "connections"}
-              class="h-20 flex-col"
+              class="btn btn-primary w-full py-3 flex items-center justify-center gap-3"
             >
-              <Database class="h-6 w-6 mb-2" />
+              <Database class="h-5 w-5" />
               Manage Connections
-            </Button>
-            <Button 
-              variant="outline"
-              class="h-20 flex-col"
+            </button>
+            <button 
               onclick={() => currentView = "query"}
               disabled={!$activeConnection}
+              class="btn btn-outline w-full py-3 flex items-center justify-center gap-3 {!$activeConnection ? 'btn-disabled' : ''}"
             >
-              <FileText class="h-6 w-6 mb-2" />
-              Run Queries
-              {#if !$activeConnection}
-                <span class="text-xs text-muted-foreground mt-1">Connect to database first</span>
-              {/if}
-            </Button>
+              <FileText class="h-5 w-5" />
+              {!$activeConnection ? "Connect to database first" : "Open Query Editor"}
+            </button>
           </div>
-        </div>
-
-
-        <!-- Demo greeting form -->
-        <div class="border-t pt-8">
-          <h3 class="text-lg font-medium text-foreground mb-4">Test Greeting</h3>
-          <form onsubmit={greet} class="flex justify-center space-x-2">
-            <Input 
-              id="greet-input" 
-              placeholder="Enter a name..." 
-              bind:value={name}
-            />
-            <Button type="submit">
-              Greet
-            </Button>
-          </form>
-          
-          {#if greetMsg}
-            <p class="text-center text-lg text-foreground mt-4">
-              {greetMsg}
-            </p>
-          {/if}
         </div>
       </div>
     {:else if currentView === "connections"}
@@ -162,7 +137,30 @@
     {:else if currentView === "query"}
       <QueryInterface activeConnection={$activeConnection} />
     {/if}
-  </main>
+    </main>
+    
+  </div>
+</div>
+
+<!-- Floating Status bar at bottom like Beekeeper Studio -->
+<div 
+  style="position: fixed; bottom: 16px; left: 16px; right: 16px; z-index: 1000; background-color: {$activeConnection?.color || '#22c55e'};" 
+  class="text-white px-4 py-2 flex items-center justify-between text-sm font-medium rounded-lg shadow-lg"
+>
+  <div class="flex items-center gap-3">
+    {#if $activeConnection}
+      <span>🦉 QueryOwl</span>
+      <span>•</span>
+      <span>Connected to {$activeConnection.name}</span>
+    {:else}
+      <span>🦉 QueryOwl</span>
+      <span>•</span>
+      <span>No database connected</span>
+    {/if}
+  </div>
+  <div class="flex items-center gap-2 text-xs">
+    <span>Ready</span>
+  </div>
 </div>
 
 

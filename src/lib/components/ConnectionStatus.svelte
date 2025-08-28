@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { Database, Wifi, WifiOff, ChevronDown } from 'lucide-svelte';
-	import { Button } from '$lib/components/ui/button';
 	import { connectionStatus, connections, loadConnections, connectToDatabase, disconnectFromDatabase } from '$lib/stores/connections';
 	import type { DatabaseConnection } from '$lib/types/database';
 	import { onMount } from 'svelte';
@@ -40,20 +39,20 @@
 				<Wifi class="h-4 w-4" />
 				<span class="text-sm font-medium">Connected to {$connectionStatus.activeConnection?.name}</span>
 			</div>
-			<Button size="sm" variant="outline" onclick={handleDisconnect}>
+			<button onclick={handleDisconnect} class="btn btn-sm btn-outline">
 				Disconnect
-			</Button>
+			</button>
 		{:else}
 			<div class="flex items-center gap-2 text-muted-foreground">
 				<WifiOff class="h-4 w-4" />
 				<span class="text-sm">Not connected</span>
 			</div>
 			{#if $connections.length > 0}
-				<Button size="sm" variant="default" onclick={toggleQuickConnect}>
+				<button onclick={toggleQuickConnect} class="btn btn-sm btn-primary">
 					<Database class="h-4 w-4 mr-2" />
 					Quick Connect
 					<ChevronDown class="h-4 w-4 ml-1" />
-				</Button>
+				</button>
 			{/if}
 		{/if}
 
@@ -88,14 +87,12 @@
 				{/each}
 			</div>
 			<div class="p-3 border-t">
-				<Button 
-					size="sm" 
-					variant="outline" 
+				<button 
 					onclick={() => showQuickConnect = false}
-					class="w-full"
+					class="btn btn-sm btn-outline w-full"
 				>
 					Cancel
-				</Button>
+				</button>
 			</div>
 		</div>
 	{/if}

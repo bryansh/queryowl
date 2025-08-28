@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import SqlEditor from '$lib/components/SqlEditor.svelte';
-	import QueryResults from '$lib/components/QueryResults.svelte';
-	import { Button } from '$lib/components/ui/button';
+	import QueryDataGrid from '$lib/components/QueryDataGrid.svelte';
 	import { Database, History, Save, FileText } from 'lucide-svelte';
 	import { invoke } from '@tauri-apps/api/core';
 	import type { DatabaseConnection } from '$lib/types/database';
@@ -96,60 +95,47 @@
 	}
 </script>
 
-<div class="query-interface flex flex-col h-full gap-4">
-	<!-- Connection Status -->
-	<div class="connection-status flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
-		{#if activeConnection}
-			<div class="flex items-center gap-3">
-				<Database class="h-5 w-5 text-green-500" />
-				<div>
-					<div class="font-medium">{activeConnection.name}</div>
-					<div class="text-sm text-muted-foreground">
-						{activeConnection.username}@{activeConnection.host}:{activeConnection.port}/{activeConnection.database}
-					</div>
-				</div>
-			</div>
-		{:else}
-			<div class="flex items-center gap-3">
-				<Database class="h-5 w-5 text-muted-foreground" />
-				<div class="text-muted-foreground">No active connection</div>
-			</div>
-		{/if}
-		
-		<div class="flex items-center gap-2">
-			<Button 
-				size="sm" 
-				variant="outline"
+<div class="query-interface flex flex-col h-full">
+	<!-- Query editor toolbar -->
+	<div class="flex items-center justify-between px-4 py-3 border-b border-slate-600 bg-slate-800">
+		<div class="flex items-center gap-3">
+			<button 
 				onclick={() => showHistory = !showHistory}
+				class="btn btn-ghost btn-sm px-3 py-2"
 			>
 				<History class="h-4 w-4 mr-2" />
 				History
-			</Button>
+			</button>
+		</div>
+		<div class="text-xs text-slate-400">
+			Press <kbd class="px-2 py-1 bg-slate-700 text-slate-300 rounded text-xs">Cmd+Enter</kbd> to execute
 		</div>
 	</div>
 
 	<!-- Query History Dropdown -->
 	{#if showHistory}
-		<div class="query-history bg-card border rounded-lg p-3">
-			<div class="flex items-center justify-between mb-3">
-				<h3 class="font-medium">Query History</h3>
-				<Button size="sm" variant="ghost" onclick={clearHistory}>
+		<div class="query-history bg-slate-800 border border-slate-600 rounded-lg mx-4 my-2 shadow-xl">
+			<div class="flex items-center justify-between p-4 border-b border-slate-600">
+				<h3 class="font-medium text-slate-200">Query History</h3>
+				<button onclick={clearHistory} class="btn btn-ghost btn-sm">
 					Clear
-				</Button>
+				</button>
 			</div>
 			{#if queryHistory.length > 0}
-				<div class="space-y-2 max-h-64 overflow-y-auto">
-					{#each queryHistory as query, i}
-						<button
-							class="w-full text-left p-2 text-sm bg-muted/50 hover:bg-muted rounded border transition-colors font-mono"
-							onclick={() => loadHistoryQuery(query)}
-						>
-							{getQueryPreview(query)}
-						</button>
-					{/each}
+				<div class="p-2">
+					<div class="space-y-1 max-h-64 overflow-y-auto">
+						{#each queryHistory as query, i}
+							<button
+								class="w-full text-left p-3 text-sm bg-slate-700 hover:bg-slate-600 rounded transition-colors font-mono text-slate-300"
+								onclick={() => loadHistoryQuery(query)}
+							>
+								{getQueryPreview(query)}
+							</button>
+						{/each}
+					</div>
 				</div>
 			{:else}
-				<div class="text-center py-4 text-muted-foreground">
+				<div class="text-center py-8 text-slate-400">
 					<FileText class="h-8 w-8 mx-auto mb-2 opacity-50" />
 					<p>No query history yet</p>
 				</div>
@@ -157,23 +143,27 @@
 		</div>
 	{/if}
 
-	<!-- SQL Editor -->
-	<div class="sql-editor flex-1">
-		<SqlEditor 
-			bind:this={sqlEditor}
-			height="300px"
-			onExecute={executeQuery}
-			{isExecuting}
-		/>
-	</div>
+	<!-- Main query interface split view -->
+	<div class="flex-1 flex flex-col">
+		<!-- SQL Editor -->
+		<div class="h-80 border-b">
+			<SqlEditor 
+				bind:this={sqlEditor}
+				height="100%"
+				onExecute={executeQuery}
+				{isExecuting}
+			/>
+		</div>
 
-	<!-- Query Results -->
-	<div class="query-results flex-1">
-		<QueryResults 
-			results={queryResults}
-			error={queryError}
-			{executionTime}
-		/>
+		<!-- Query Results -->
+		<div class="flex-1 min-h-0">
+			<QueryDataGrid 
+				data={queryResults}
+				error={queryError}
+				{executionTime}
+				maxHeight="100%"
+			/>
+		</div>
 	</div>
 </div>
 

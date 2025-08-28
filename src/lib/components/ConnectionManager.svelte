@@ -1,10 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
 	import { Database, Plus, Trash2, TestTube, Loader2, AlertCircle, CheckCircle, Edit } from 'lucide-svelte';
 	import { connections, loadConnections, saveConnection, updateConnection, deleteConnection, testConnection, connectToDatabase } from '$lib/stores/connections';
 	import type { CreateConnectionRequest, UpdateConnectionRequest, TestConnectionRequest, TestConnectionResponse } from '$lib/types/database';
+	import { CONNECTION_COLORS, getRandomConnectionColor } from '$lib/utils/colors';
 	import { invoke } from '@tauri-apps/api/core';
 
 	let showForm = $state(false);
@@ -20,7 +19,8 @@
 		database: '',
 		username: '',
 		password: '',
-		ssl: false
+		ssl: false,
+		color: getRandomConnectionColor()
 	});
 
 	onMount(() => {
@@ -101,7 +101,8 @@
 			database: connection.database,
 			username: connection.username,
 			password: '', // Clear password field for security - user must re-enter
-			ssl: connection.ssl || false
+			ssl: connection.ssl || false,
+			color: connection.color || getRandomConnectionColor()
 		};
 		editingId = connection.id;
 		showForm = true;
@@ -115,7 +116,8 @@
 			database: '',
 			username: '',
 			password: '',
-			ssl: false
+			ssl: false,
+			color: getRandomConnectionColor()
 		};
 		editingId = null;
 	}
@@ -132,96 +134,128 @@
 			<Database class="h-6 w-6 text-primary" />
 			<h1 class="text-2xl font-semibold text-foreground">Connection Manager</h1>
 		</div>
-		<Button onclick={() => showForm = !showForm} variant="default">
+		<button onclick={() => showForm = !showForm} class="btn btn-primary">
 			<Plus class="h-4 w-4 mr-2" />
 			Add Connection
-		</Button>
+		</button>
 	</div>
 
 	{#if showForm}
-		<div class="bg-card border rounded-lg p-6 mb-6">
-			<h2 class="text-lg font-medium mb-4 text-foreground">
-				{editingId ? 'Edit PostgreSQL Connection' : 'New PostgreSQL Connection'}
-			</h2>
-			<form onsubmit={handleSubmit} class="space-y-4">
-				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-					<div>
-						<label class="block text-sm font-medium text-foreground mb-2">Connection Name</label>
-						<Input 
-							bind:value={formData.name} 
-							placeholder="My Database"
-							required
-						/>
+		<div class="bg-card border rounded-lg p-16 mb-6 w-full h-full min-h-[80vh]">
+			<div class="max-w-6xl mx-auto h-full flex flex-col">
+				<h2 class="text-4xl font-bold mb-12 text-foreground text-center">
+					{editingId ? 'Edit PostgreSQL Connection' : 'New PostgreSQL Connection'}
+				</h2>
+				<form onsubmit={handleSubmit} class="flex-1 flex flex-col justify-center space-y-16">
+					<!-- First Row -->
+					<div class="queryowl-form-grid">
+						<div class="queryowl-field">
+							<label class="queryowl-label">Connection Name</label>
+							<input 
+								bind:value={formData.name} 
+								placeholder="My Database"
+								required
+								class="queryowl-input"
+							/>
+						</div>
+						<div class="queryowl-field">
+							<label class="queryowl-label">Database Name</label>
+							<input 
+								bind:value={formData.database} 
+								placeholder="myapp_production"
+								required
+								class="queryowl-input"
+							/>
+						</div>
+						<div class="queryowl-field">
+							<label class="queryowl-label">Host</label>
+							<input 
+								bind:value={formData.host} 
+								placeholder="localhost"
+								required
+								class="queryowl-input"
+							/>
+						</div>
 					</div>
-					<div>
-						<label class="block text-sm font-medium text-foreground mb-2">Database Name</label>
-						<Input 
-							bind:value={formData.database} 
-							placeholder="myapp_production"
-							required
-						/>
+					
+					<!-- Second Row -->
+					<div class="queryowl-form-grid">
+						<div class="queryowl-field">
+							<label class="queryowl-label">Port</label>
+							<input 
+								bind:value={formData.port} 
+								type="number"
+								placeholder="5432"
+								required
+								class="queryowl-input"
+							/>
+						</div>
+						<div class="queryowl-field">
+							<label class="queryowl-label">Username</label>
+							<input 
+								bind:value={formData.username} 
+								placeholder="postgres"
+								required
+								class="queryowl-input"
+							/>
+						</div>
+						<div class="queryowl-field">
+							<label class="queryowl-label">Password</label>
+							<input 
+								bind:value={formData.password} 
+								type="password"
+								placeholder={editingId ? "Enter password (required)" : "••••••••"}
+								required
+								class="queryowl-input"
+							/>
+						</div>
 					</div>
+				
+					<!-- Color Picker -->
 					<div>
-						<label class="block text-sm font-medium text-foreground mb-2">Host</label>
-						<Input 
-							bind:value={formData.host} 
-							placeholder="localhost"
-							required
-						/>
+						<label class="queryowl-label">Connection Color</label>
+						<div class="flex flex-wrap gap-[2rem]">
+							{#each CONNECTION_COLORS as color}
+								<button
+									type="button"
+									class="w-[3rem] h-[3rem] rounded transition-all duration-200 hover:scale-105 cursor-pointer shadow-lg {formData.color === color ? 'ring-2 ring-blue-400' : ''}"
+									style="background-color: {color};"
+									onclick={() => formData.color = color}
+									title={color}
+								></button>
+							{/each}
+						</div>
 					</div>
-					<div>
-						<label class="block text-sm font-medium text-foreground mb-2">Port</label>
-						<Input 
-							bind:value={formData.port} 
-							type="number"
-							placeholder="5432"
-							required
+					
+					<div class="flex items-center justify-center gap-6">
+						<input 
+							type="checkbox" 
+							bind:checked={formData.ssl} 
+							id="ssl"
+							class="rounded border-input w-8 h-8"
 						/>
+						<label for="ssl" class="queryowl-label">Use SSL</label>
 					</div>
-					<div>
-						<label class="block text-sm font-medium text-foreground mb-2">Username</label>
-						<Input 
-							bind:value={formData.username} 
-							placeholder="postgres"
-							required
-						/>
+					
+					<div class="flex gap-8 pt-8 justify-center">
+						<button type="submit" disabled={isLoading} class="queryowl-button">
+							{#if isLoading}
+								<Loader2 class="h-6 w-6 mr-4 animate-spin" />
+							{/if}
+							{editingId ? 'Update Connection' : 'Save Connection'}
+						</button>
+						<button type="button" onclick={() => { showForm = false; resetForm(); }} class="queryowl-button queryowl-button-outline">
+							Cancel
+						</button>
 					</div>
-					<div>
-						<label class="block text-sm font-medium text-foreground mb-2">Password</label>
-						<Input 
-							bind:value={formData.password} 
-							type="password"
-							placeholder={editingId ? "Enter password (required)" : "••••••••"}
-							required
-						/>
-					</div>
-				</div>
-				<div class="flex items-center gap-3">
-					<input 
-						type="checkbox" 
-						bind:checked={formData.ssl} 
-						id="ssl"
-						class="rounded border-input"
-					/>
-					<label for="ssl" class="text-sm text-foreground">Use SSL</label>
-				</div>
-				<div class="flex gap-3 pt-4">
-					<Button type="submit" disabled={isLoading}>
-						{#if isLoading}
-							<Loader2 class="h-4 w-4 mr-2 animate-spin" />
-						{/if}
-						{editingId ? 'Update Connection' : 'Save Connection'}
-					</Button>
-					<Button type="button" variant="outline" onclick={() => { showForm = false; resetForm(); }}>
-						Cancel
-					</Button>
-				</div>
-			</form>
+				</form>
+			</div>
 		</div>
 	{/if}
 
-	<div class="space-y-4">
-		{#each $connections as connection (connection.id)}
+	{#if !showForm}
+		<div class="space-y-4">
+			{#each $connections as connection (connection.id)}
 			<div class="bg-card border rounded-lg p-4">
 				<div class="flex items-center justify-between">
 					<div class="flex-1">
@@ -250,37 +284,33 @@
 						{/if}
 					</div>
 					<div class="flex items-center gap-2">
-						<Button 
-							size="sm" 
-							variant="outline"
+						<button 
 							onclick={() => handleTest(connection)}
 							title="Test Connection"
+							class="btn btn-sm btn-outline"
 						>
 							<TestTube class="h-4 w-4" />
-						</Button>
-						<Button 
-							size="sm" 
-							variant="default"
+						</button>
+						<button 
 							onclick={() => handleConnect(connection)}
+							class="btn btn-sm btn-primary"
 						>
 							Connect
-						</Button>
-						<Button 
-							size="sm" 
-							variant="outline"
+						</button>
+						<button 
 							onclick={() => handleEdit(connection)}
 							title="Edit Connection"
+							class="btn btn-sm btn-outline"
 						>
 							<Edit class="h-4 w-4" />
-						</Button>
-						<Button 
-							size="sm" 
-							variant="outline"
+						</button>
+						<button 
 							onclick={() => handleDelete(connection.id)}
 							title="Delete Connection"
+							class="btn btn-sm btn-outline btn-error"
 						>
-							<Trash2 class="h-4 w-4 text-destructive" />
-						</Button>
+							<Trash2 class="h-4 w-4" />
+						</button>
 					</div>
 				</div>
 			</div>
@@ -289,13 +319,14 @@
 				<Database class="h-12 w-12 text-muted-foreground mx-auto mb-4" />
 				<h3 class="text-lg font-medium text-foreground mb-2">No connections yet</h3>
 				<p class="text-muted-foreground mb-4">Add your first PostgreSQL connection to get started</p>
-				<Button onclick={() => showForm = true}>
+				<button onclick={() => showForm = true} class="btn btn-primary">
 					<Plus class="h-4 w-4 mr-2" />
 					Add Connection
-				</Button>
+				</button>
 			</div>
 		{/each}
-	</div>
+		</div>
+	{/if}
 	
 	<!-- Delete Confirmation Dialog -->
 	{#if deleteConfirm.show}
@@ -306,12 +337,12 @@
 					Are you sure you want to delete this connection? This action cannot be undone.
 				</p>
 				<div class="flex gap-3 justify-end">
-					<Button variant="outline" onclick={cancelDelete}>
+					<button onclick={cancelDelete} class="btn btn-outline">
 						Cancel
-					</Button>
-					<Button variant="destructive" onclick={confirmDelete}>
+					</button>
+					<button onclick={confirmDelete} class="btn btn-error">
 						Delete Connection
-					</Button>
+					</button>
 				</div>
 			</div>
 		</div>

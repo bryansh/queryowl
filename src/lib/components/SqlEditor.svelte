@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import loader from '@monaco-editor/loader';
-	import { Button } from '$lib/components/ui/button';
 	import { Play, Loader2, Save, FileDown } from 'lucide-svelte';
 	
 	let { 
@@ -63,7 +62,7 @@
 		editor = monaco.editor.create(container, {
 			value: value,
 			language: 'sql',
-			theme: theme,
+			theme: 'vs-dark',
 			minimap: { enabled: false },
 			automaticLayout: true,
 			fontSize: 14,
@@ -165,41 +164,39 @@
 	}
 </script>
 
-<div class="sql-editor-container border rounded-lg overflow-hidden bg-background">
-	<div class="editor-toolbar flex items-center justify-between p-2 border-b bg-muted/30">
-		<div class="flex items-center gap-2">
-			<Button 
-				size="sm" 
+<div class="sql-editor-container h-full flex flex-col bg-slate-900">
+	<div class="editor-toolbar flex items-center justify-between px-4 py-3 border-b border-slate-700 bg-slate-800">
+		<div class="flex items-center gap-3">
+			<button 
 				onclick={handleExecute}
 				disabled={!onExecute || isExecuting}
 				title="Execute Query (Cmd+Enter)"
+				class="btn btn-primary btn-sm px-4 py-2 font-medium"
 			>
 				{#if isExecuting}
 					<Loader2 class="h-4 w-4 mr-2 animate-spin" />
 					Executing...
 				{:else}
 					<Play class="h-4 w-4 mr-2" />
-					Run Query
+					Run
 				{/if}
-			</Button>
-			<Button 
-				size="sm" 
-				variant="outline"
+			</button>
+			<button 
 				onclick={formatSql}
 				title="Format SQL"
+				class="btn btn-ghost btn-sm px-3 py-2"
 			>
 				Format
-			</Button>
+			</button>
 		</div>
-		<div class="text-sm text-muted-foreground">
-			Press <kbd class="px-1.5 py-0.5 text-xs bg-muted rounded">Cmd+Enter</kbd> to execute
+		<div class="text-xs text-slate-400 font-medium">
+			Query #1
 		</div>
 	</div>
 	<div 
 		bind:this={container} 
-		class="editor-container"
-		style="height: {height}"
-	/>
+		class="flex-1 editor-container"
+	></div>
 </div>
 
 <style>
