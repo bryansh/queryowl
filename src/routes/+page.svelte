@@ -79,6 +79,25 @@
     // Load and execute the query
     await queryInterface.loadAndRunQuery(sql);
   }
+
+  // Handle editing a query from history (load without running)
+  async function handleEditQueryFromHistory(sql) {
+    // Switch to query view
+    currentView = "query";
+    // Wait for the next tick to ensure the component is mounted and reactive
+    await new Promise(resolve => {
+      const checkReady = () => {
+        if (queryInterface && queryInterface.loadQuery) {
+          resolve();
+        } else {
+          requestAnimationFrame(checkReady);
+        }
+      };
+      checkReady();
+    });
+    // Load the query without executing
+    queryInterface.loadQuery(sql);
+  }
 </script>
 
 <div class="w-full h-full flex overflow-hidden">
@@ -197,7 +216,7 @@
     {:else if currentView === "query"}
       <QueryInterface bind:this={queryInterface} activeConnection={$activeConnection} />
     {:else if currentView === "history"}
-      <QueryHistory activeConnection={$activeConnection} onRunQuery={handleRunQueryFromHistory} />
+      <QueryHistory activeConnection={$activeConnection} onRunQuery={handleRunQueryFromHistory} onEditQuery={handleEditQueryFromHistory} />
     {/if}
     </main>
     

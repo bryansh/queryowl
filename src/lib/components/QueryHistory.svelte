@@ -1,15 +1,17 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { History, Search, Play, Edit, Trash2, FileText, Calendar, Clock, Database } from 'lucide-svelte';
+	import { History, Search, Play, Edit, Trash2, FileText, Calendar, Clock, Database, Copy, CheckCircle } from 'lucide-svelte';
 	import type { DatabaseConnection } from '$lib/types/database';
 	import { Modal } from '@skeletonlabs/skeleton-svelte';
 	
 	let { 
 		activeConnection,
-		onRunQuery
+		onRunQuery,
+		onEditQuery
 	}: { 
 		activeConnection: DatabaseConnection | null;
 		onRunQuery?: (sql: string) => void;
+		onEditQuery?: (sql: string) => void;
 	} = $props();
 	
 	let queryHistory: string[] = $state([]);
@@ -17,6 +19,9 @@
 	let selectedQuery = $state<string | null>(null);
 	let deleteModalOpen = $state(false);
 	let queryToDelete = $state<string | null>(null);
+	let queryModalOpen = $state(false);
+	let modalQuery = $state<string | null>(null);
+	let copied = $state(false);
 	
 	onMount(() => {
 		loadQueryHistory();
@@ -80,19 +85,19 @@
 		}
 	}
 	
-	function handleRunQuery(sql: string) {
+	function handleRunQuery(sql) {
 		if (onRunQuery && activeConnection) {
 			onRunQuery(sql);
 		}
 	}
 	
-	function handleEditQuery(sql: string) {
-		if (onRunQuery && activeConnection) {
-			onRunQuery(sql);
+	function handleEditQuery(sql) {
+		if (onEditQuery && activeConnection) {
+			onEditQuery(sql);
 		}
 	}
 	
-	function handleDeleteQuery(sql: string) {
+	function handleDeleteQuery(sql) {
 		queryToDelete = sql;
 		deleteModalOpen = true;
 	}
@@ -118,8 +123,23 @@
 		selectedQuery = null;
 	}
 	
-	function selectQuery(sql: string) {
-		selectedQuery = selectedQuery === sql ? null : sql;
+	function selectQuery(sql) {
+		modalQuery = sql;
+		queryModalOpen = true;
+	}
+	
+	function closeQueryModal() {
+		queryModalOpen = false;
+		modalQuery = null;
+		copied = false;
+	}
+	
+	function copyQueryToClipboard() {
+		if (modalQuery) {
+			navigator.clipboard.writeText(modalQuery);
+			copied = true;
+			setTimeout(() => copied = false, 2000);
+		}
 	}
 </script>
 
@@ -156,15 +176,15 @@
 	<!-- Query History List -->
 	<div class="flex-1 min-h-0">
 		{#if filteredQueries.length > 0}
-			<div class="grid gap-4 overflow-y-auto h-full">
+			<div class="flex flex-col gap-2 overflow-y-auto">
 				{#each filteredQueries as query, i (query)}
 					<div 
-						class="card p-4 cursor-pointer hover:bg-surface-200-700/50 transition-colors {selectedQuery === query ? 'ring-2 ring-primary-500' : ''}"
+						class="card p-3 cursor-pointer hover:bg-surface-200-700/50 transition-colors"
 						onclick={() => selectQuery(query)}
 					>
 						<div class="flex items-start justify-between gap-4">
 							<div class="flex-1 min-w-0">
-								<div class="flex items-center gap-3 mb-3">
+								<div class="flex items-center gap-3 mb-1.5">
 									<span class={`px-2 py-1 text-xs font-medium rounded border ${getQueryTypeColor(getQueryType(query))}`}>
 										{getQueryType(query)}
 									</span>
@@ -174,17 +194,9 @@
 									</div>
 								</div>
 								
-								<div class="font-mono text-sm text-surface-300 mb-2 leading-relaxed">
+								<div class="font-mono text-sm text-surface-300 leading-tight truncate">
 									{getQueryPreview(query)}
 								</div>
-								
-								{#if selectedQuery === query}
-									<div class="mt-4 p-4 bg-surface-100-900 rounded-lg border border-surface-300-600">
-										<div class="font-mono text-sm whitespace-pre-wrap text-surface-200 leading-relaxed">
-											{query}
-										</div>
-									</div>
-								{/if}
 							</div>
 							
 							<div class="flex items-center gap-2 flex-shrink-0">
@@ -241,6 +253,85 @@
 		{/if}
 	</div>
 </div>
+
+<!-- Query View Modal -->
+<Modal 
+	open={queryModalOpen}
+	onOpenChange={(e) => (queryModalOpen = e.open)}
+	contentBase="card bg-surface-100-900 p-0 space-y-0 shadow-xl max-w-4xl mx-4 max-h-[80vh] flex flex-col"
+>
+	{#snippet content()}
+		{#if modalQuery}
+			<!-- Modal Header -->
+			<div class="flex items-center justify-between p-6 border-b border-surface-300-600">
+				<div class="flex items-center gap-3">
+					<span class={`px-2 py-1 text-xs font-medium rounded border ${getQueryTypeColor(getQueryType(modalQuery))}`}>
+						{getQueryType(modalQuery)}
+					</span>
+					<h3 class="text-lg font-semibold">Query Details</h3>
+				</div>
+				<button 
+					onclick={closeQueryModal}
+					class="btn btn-sm btn-ghost-surface hover:bg-surface-300-600"
+					title="Close"
+				>
+					✕
+				</button>
+			</div>
+			
+			<!-- Query Content -->
+			<div class="flex-1 p-6 overflow-y-auto">
+				<div class="relative bg-surface-200-700 p-4 rounded-lg border border-surface-300-600">
+					<pre class="font-mono text-sm text-surface-200 leading-relaxed whitespace-pre-wrap overflow-x-auto pr-12">{modalQuery}</pre>
+					<button 
+						onclick={copyQueryToClipboard}
+						class="absolute top-3 right-3 btn btn-sm btn-ghost-surface hover:bg-surface-300-600 border border-surface-400-500"
+						title="Copy Query"
+					>
+						{#if copied}
+							<CheckCircle class="h-4 w-4 text-green-400" />
+						{:else}
+							<Copy class="h-4 w-4" />
+						{/if}
+					</button>
+				</div>
+			</div>
+			
+			<!-- Modal Actions -->
+			<div class="flex gap-3 justify-end p-6 border-t border-surface-300-600">
+				<button 
+					onclick={closeQueryModal}
+					class="btn btn-ghost-surface border border-surface-400-500 hover:bg-surface-300-600"
+				>
+					Close
+				</button>
+				<button 
+					onclick={() => { if (modalQuery) handleDeleteQuery(modalQuery); closeQueryModal(); }}
+					class="btn btn-filled-error border border-red-500 hover:border-red-400"
+				>
+					<Trash2 class="h-4 w-4 mr-2" />
+					Delete
+				</button>
+				<button 
+					onclick={() => { if (modalQuery) handleEditQuery(modalQuery); closeQueryModal(); }}
+					disabled={!activeConnection}
+					class="btn btn-ghost-surface border border-surface-400-500 hover:bg-surface-300-600 disabled:opacity-50 disabled:cursor-not-allowed"
+				>
+					<Edit class="h-4 w-4 mr-2" />
+					Edit
+				</button>
+				<button 
+					onclick={() => { if (modalQuery) handleRunQuery(modalQuery); closeQueryModal(); }}
+					disabled={!activeConnection}
+					class="btn btn-filled-primary border border-primary-500 hover:border-primary-400 disabled:opacity-50 disabled:cursor-not-allowed"
+				>
+					<Play class="h-4 w-4 mr-2" />
+					Run Query
+				</button>
+			</div>
+		{/if}
+	{/snippet}
+</Modal>
 
 <!-- Delete Confirmation Modal -->
 <Modal 
