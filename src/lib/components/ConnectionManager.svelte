@@ -146,7 +146,7 @@
 	</div>
 
 	{#if showForm}
-		<div class="card p-8 mb-6">
+		<div class="card p-8 mb-6" style="border-left: 5px solid {formData.color}; padding-left: calc(2rem - 5px);">
 			<h2 class="text-2xl font-bold mb-6">
 				{editingId ? 'Edit PostgreSQL Connection' : 'New PostgreSQL Connection'}
 			</h2>
@@ -261,7 +261,7 @@
 	{#if !showForm}
 		<div class="space-y-4">
 			{#each $connections as connection (connection.id)}
-				<div class="card p-4">
+				<div class="card p-4" style="border-left: 5px solid {connection.color || '#22c55e'}; padding-left: calc(1rem - 5px);">
 					<div class="flex items-center justify-between">
 						<div class="flex-1">
 							<div class="flex items-center gap-3 mb-2">
