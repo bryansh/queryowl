@@ -135,7 +135,7 @@
 
 <div class="p-6 pt-2 max-w-6xl mx-auto">
 	<div class="flex items-center justify-end mb-4">
-		<button class="btn btn-filled-primary" onclick={() => showForm = !showForm}>
+		<button class="btn btn-ghost-surface px-6 py-2 bg-surface-200-700 hover:bg-surface-300-600 border border-surface-300-600 rounded-lg transition-colors" onclick={() => showForm = !showForm}>
 			<Plus class="h-4 w-4 mr-2" />
 			Add Connection
 		</button>

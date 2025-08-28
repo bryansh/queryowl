@@ -125,50 +125,50 @@
 
 <div class="query-data-grid h-full flex flex-col bg-background">
 	{#if error}
-		<div class="p-4 bg-red-900/20 text-red-400 border-b border-red-800">
-			<div class="flex items-center gap-2">
-				<AlertCircle class="h-5 w-5" />
-				<span class="font-medium">Query Error</span>
+		<div class="p-6 bg-red-900/20 text-red-400 border-b border-red-800 rounded-t-lg">
+			<div class="flex items-center gap-3">
+				<AlertCircle class="h-6 w-6" />
+				<span class="text-lg font-medium">Query Error</span>
 			</div>
-			<pre class="mt-2 text-sm whitespace-pre-wrap font-mono">{error}</pre>
+			<pre class="mt-4 text-base whitespace-pre-wrap font-mono bg-red-900/30 p-4 rounded-lg">{error}</pre>
 		</div>
 	{:else if data && data.length > 0}
-		<div class="toolbar flex items-center justify-between px-4 py-3 border-b border-slate-700 bg-slate-800">
-			<div class="flex items-center gap-4 text-sm">
-				<span class="flex items-center gap-2 text-slate-300 font-medium">
-					<Table class="h-4 w-4" />
-					<strong>{data.length.toLocaleString()}</strong> {data.length === 1 ? 'row' : 'rows'}
+		<div class="toolbar flex items-center justify-between px-6 py-4 border-b border-slate-700 bg-slate-800">
+			<div class="flex items-center gap-5 text-base">
+				<span class="flex items-center gap-3 text-slate-300 font-medium">
+					<Table class="h-5 w-5 text-primary-500" />
+					<strong class="text-lg">{data.length.toLocaleString()}</strong> <span class="text-base">{data.length === 1 ? 'row' : 'rows'}</span>
 				</span>
 				{#if executionTime !== null}
-					<span class="text-slate-400">
+					<span class="text-slate-400 font-medium">
 						{executionTime}ms
 					</span>
 				{/if}
 				<span class="text-slate-500">•</span>
-				<span class="text-slate-400 text-xs">
-					0 affected
+				<span class="text-slate-400 text-sm">
+					Ready
 				</span>
 			</div>
 			
 			<div class="flex items-center gap-3">
 				<button 
 					onclick={copyToClipboard}
-					class="btn btn-ghost btn-sm px-3 py-2"
+					class="btn btn-ghost px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors"
 				>
 					{#if copied}
-						<CheckCircle class="h-4 w-4 mr-2 text-green-500" />
-						Copy
+						<CheckCircle class="h-5 w-5 mr-2 text-green-500" />
+						Copied
 					{:else}
-						<Copy class="h-4 w-4 mr-2" />
+						<Copy class="h-5 w-5 mr-2" />
 						Copy
 					{/if}
 				</button>
 				<button 
 					onclick={exportToCsv}
-					class="btn btn-ghost btn-sm px-3 py-2"
+					class="btn btn-ghost px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors"
 				>
-					<Download class="h-4 w-4 mr-2" />
-					Download
+					<Download class="h-5 w-5 mr-2" />
+					Export CSV
 				</button>
 			</div>
 		</div>
@@ -189,9 +189,9 @@
 	{:else}
 		<div class="flex-1 flex items-center justify-center text-slate-400">
 			<div class="text-center">
-				<Table class="h-12 w-12 mx-auto mb-3 opacity-50" />
-				<p>No results to display</p>
-				<p class="text-sm mt-1 opacity-75">Run a query to see results here</p>
+				<Table class="h-16 w-16 mx-auto mb-4 opacity-50 text-primary-500" />
+				<p class="text-xl font-medium">No results to display</p>
+				<p class="text-base mt-2 opacity-75">Execute a SQL query to see results here</p>
 			</div>
 		</div>
 	{/if}

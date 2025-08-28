@@ -2,21 +2,23 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
-  import { Database, Settings, FileText, Menu } from "lucide-svelte";
+  import { Database, Settings, FileText, Menu, History } from "lucide-svelte";
   import { Navigation } from '@skeletonlabs/skeleton-svelte';
   import ConnectionManager from "$lib/components/ConnectionManager.svelte";
   import ConnectionStatus from "$lib/components/ConnectionStatus.svelte";
   import UpdateNotification from "$lib/components/UpdateNotification.svelte";
   import QueryInterface from "$lib/components/QueryInterface.svelte";
+  import QueryHistory from "$lib/components/QueryHistory.svelte";
   import { connections, activeConnection, disconnectFromDatabase as disconnectDB } from '$lib/stores/connections';
 
   let name = $state("");
   let greetMsg = $state("");
-  let currentView = $state("home"); // "home", "connections", "query"
+  let currentView = $state("home"); // "home", "connections", "query", "history"
   let showLogPath = $state(false);
   let logPath = $state("");
   let isNavExpanded = $state(false);
   let showStatusMenu = $state(false);
+  let queryInterface;
 
   onMount(async () => {
     // Listen for menu events
@@ -58,6 +60,25 @@
       console.error('Failed to disconnect:', error);
     }
   }
+
+  // Handle running a query from history
+  async function handleRunQueryFromHistory(sql) {
+    // Switch to query view
+    currentView = "query";
+    // Wait for the next tick to ensure the component is mounted and reactive
+    await new Promise(resolve => {
+      const checkReady = () => {
+        if (queryInterface && queryInterface.loadAndRunQuery) {
+          resolve();
+        } else {
+          requestAnimationFrame(checkReady);
+        }
+      };
+      checkReady();
+    });
+    // Load and execute the query
+    await queryInterface.loadAndRunQuery(sql);
+  }
 </script>
 
 <div class="w-full h-full flex overflow-hidden">
@@ -88,6 +109,15 @@
       >
         <FileText />
       </Navigation.Tile>
+      <Navigation.Tile 
+        id="history"
+        labelExpanded="Query History"
+        onclick={() => currentView = "history"}
+        disabled={!$activeConnection}
+        classes={`flex items-center justify-center ${!$activeConnection ? 'opacity-50 cursor-not-allowed' : ''}`}
+      >
+        <History />
+      </Navigation.Tile>
     {/snippet}
     
     {#snippet tiles()}
@@ -99,21 +129,32 @@
     <!-- Top toolbar -->
     <header class="card flex-shrink-0 flex items-center justify-between px-6 py-2 mb-2">
       <div class="flex items-center gap-4">
-        {#if currentView === "query" && $activeConnection}
-          <span class="text-sm font-medium">
-            {$activeConnection.name} • {$activeConnection.database}
-          </span>
-        {:else if currentView === "connections"}
+        {#if currentView === "connections"}
           <div class="flex items-center gap-3">
             <Database class="h-8 w-8 text-primary-500" />
             <h1 class="text-3xl font-semibold">Connection Manager</h1>
           </div>
-        {:else}
-          <span class="text-sm font-medium">Welcome to QueryOwl</span>
+        {:else if currentView === "query"}
+          <div class="flex items-center gap-3">
+            <FileText class="h-8 w-8 text-primary-500" />
+            <h1 class="text-3xl font-semibold">Query Editor</h1>
+          </div>
+        {:else if currentView === "history"}
+          <div class="flex items-center gap-3">
+            <History class="h-8 w-8 text-primary-500" />
+            <h1 class="text-3xl font-semibold">Query History</h1>
+          </div>
         {/if}
       </div>
       <div class="flex items-center gap-2">
-        <!-- Add any toolbar actions here if needed -->
+        {#if currentView === "query" && $activeConnection}
+          <div class="flex items-center gap-2 text-surface-500">
+            <Database class="h-5 w-5" style="color: {$activeConnection.color || '#14b8a6'}" />
+            <span class="text-lg font-medium">{$activeConnection.name}</span>
+            <span>•</span>
+            <span class="text-base">{$activeConnection.database}</span>
+          </div>
+        {/if}
       </div>
     </header>
 
@@ -154,7 +195,9 @@
     {:else if currentView === "connections"}
       <ConnectionManager />
     {:else if currentView === "query"}
-      <QueryInterface activeConnection={$activeConnection} />
+      <QueryInterface bind:this={queryInterface} activeConnection={$activeConnection} />
+    {:else if currentView === "history"}
+      <QueryHistory activeConnection={$activeConnection} onRunQuery={handleRunQueryFromHistory} />
     {/if}
     </main>
     

@@ -8,13 +8,15 @@
 		theme = 'vs-dark',
 		height = '400px',
 		onExecute,
-		isExecuting = false
+		isExecuting = false,
+		onReady
 	}: {
 		value?: string;
 		theme?: string;
 		height?: string;
 		onExecute?: ((sql: string) => Promise<void>) | undefined;
 		isExecuting?: boolean;
+		onReady?: (() => void) | undefined;
 	} = $props();
 	
 	let container: HTMLDivElement;
@@ -108,6 +110,11 @@
 				}
 			}
 		});
+		
+		// Notify parent component that the editor is ready
+		if (onReady) {
+			onReady();
+		}
 	});
 	
 	onDestroy(() => {
@@ -125,28 +132,6 @@
 		}
 	}
 	
-	function formatSql() {
-		// Basic SQL formatting - you could enhance this with a proper SQL formatter
-		const sql = editor.getValue();
-		const formatted = sql
-			.replace(/\s+/g, ' ')
-			.replace(/\s*,\s*/g, ',\n  ')
-			.replace(/\sSELECT\s/gi, 'SELECT\n  ')
-			.replace(/\sFROM\s/gi, '\nFROM ')
-			.replace(/\sWHERE\s/gi, '\nWHERE ')
-			.replace(/\sJOIN\s/gi, '\nJOIN ')
-			.replace(/\sLEFT JOIN\s/gi, '\nLEFT JOIN ')
-			.replace(/\sRIGHT JOIN\s/gi, '\nRIGHT JOIN ')
-			.replace(/\sINNER JOIN\s/gi, '\nINNER JOIN ')
-			.replace(/\sGROUP BY\s/gi, '\nGROUP BY ')
-			.replace(/\sORDER BY\s/gi, '\nORDER BY ')
-			.replace(/\sHAVING\s/gi, '\nHAVING ')
-			.replace(/\sLIMIT\s/gi, '\nLIMIT ')
-			.replace(/\sOFFSET\s/gi, '\nOFFSET ');
-		
-		editor.setValue(formatted);
-	}
-	
 	export function getSelectedText() {
 		const selection = editor.getSelection();
 		return editor.getModel().getValueInRange(selection);
@@ -162,41 +147,45 @@
 		}
 		value = newValue;
 	}
+	
+	export function focus() {
+		if (editor) {
+			// Move cursor to end of content and focus
+			const model = editor.getModel();
+			if (model) {
+				const lineCount = model.getLineCount();
+				const lastLineLength = model.getLineMaxColumn(lineCount);
+				const position = { lineNumber: lineCount, column: lastLineLength };
+				editor.setPosition(position);
+			}
+			editor.focus();
+		}
+	}
 </script>
 
-<div class="sql-editor-container h-full flex flex-col bg-slate-900">
-	<div class="editor-toolbar flex items-center justify-between px-4 py-3 border-b border-slate-700 bg-slate-800">
-		<div class="flex items-center gap-3">
-			<button 
-				onclick={handleExecute}
-				disabled={!onExecute || isExecuting}
-				title="Execute Query (Cmd+Enter)"
-				class="btn btn-filled-primary btn-sm px-4 py-2 font-medium"
-			>
-				{#if isExecuting}
-					<Loader2 class="h-4 w-4 mr-2 animate-spin" />
-					Executing...
-				{:else}
-					<Play class="h-4 w-4 mr-2" />
-					Run
-				{/if}
-			</button>
-			<button 
-				onclick={formatSql}
-				title="Format SQL"
-				class="btn btn-ghost btn-sm px-3 py-2"
-			>
-				Format
-			</button>
-		</div>
-		<div class="text-xs text-slate-400 font-medium">
-			Query #1
-		</div>
-	</div>
+<div class="sql-editor-container h-full relative bg-slate-900">
 	<div 
 		bind:this={container} 
-		class="flex-1 editor-container"
+		class="h-full editor-container"
 	></div>
+	
+	<!-- Floating Execute Button -->
+	<button 
+		onclick={handleExecute}
+		disabled={!onExecute || isExecuting}
+		title="Execute Query (Cmd+Enter)"
+		class="absolute bottom-4 right-4 btn btn-filled-primary bg-primary-600 hover:bg-primary-700 text-white rounded-full shadow-lg transition-all duration-200 disabled:opacity-50 z-10 hover:scale-105 group overflow-hidden"
+	>
+		<div class="flex items-center transition-all duration-200 group-hover:px-4 p-2">
+			{#if isExecuting}
+				<Loader2 class="h-5 w-5 animate-spin flex-shrink-0" />
+				<span class="ml-2 whitespace-nowrap opacity-0 w-0 group-hover:opacity-100 group-hover:w-auto transition-all duration-200 font-medium text-sm">Executing</span>
+			{:else}
+				<Play class="h-5 w-5 flex-shrink-0" />
+				<span class="ml-2 whitespace-nowrap opacity-0 w-0 group-hover:opacity-100 group-hover:w-auto transition-all duration-200 font-medium text-sm">Execute</span>
+			{/if}
+		</div>
+	</button>
 </div>
 
 <style>
