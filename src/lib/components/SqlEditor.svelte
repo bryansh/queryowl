@@ -171,7 +171,7 @@
 				onclick={handleExecute}
 				disabled={!onExecute || isExecuting}
 				title="Execute Query (Cmd+Enter)"
-				class="btn btn-primary btn-sm px-4 py-2 font-medium"
+				class="btn btn-filled-primary btn-sm px-4 py-2 font-medium"
 			>
 				{#if isExecuting}
 					<Loader2 class="h-4 w-4 mr-2 animate-spin" />

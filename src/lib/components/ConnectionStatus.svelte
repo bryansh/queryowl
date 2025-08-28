@@ -33,22 +33,22 @@
 </script>
 
 <div class="relative">
-	<div class="flex items-center gap-3">
+	<div class="flex flex-col gap-3">
 		{#if $connectionStatus.isConnected}
-			<div class="flex items-center gap-2 text-green-600">
+			<div class="flex items-center gap-2 text-success-500">
 				<Wifi class="h-4 w-4" />
 				<span class="text-sm font-medium">Connected to {$connectionStatus.activeConnection?.name}</span>
 			</div>
-			<button onclick={handleDisconnect} class="btn btn-sm btn-outline">
+			<button onclick={handleDisconnect} class="btn btn-sm btn-ghost-surface">
 				Disconnect
 			</button>
 		{:else}
-			<div class="flex items-center gap-2 text-muted-foreground">
+			<div class="flex items-center gap-2 text-surface-500">
 				<WifiOff class="h-4 w-4" />
 				<span class="text-sm">Not connected</span>
 			</div>
 			{#if $connections.length > 0}
-				<button onclick={toggleQuickConnect} class="btn btn-sm btn-primary">
+				<button onclick={toggleQuickConnect} class="btn btn-sm btn-filled-primary">
 					<Database class="h-4 w-4 mr-2" />
 					Quick Connect
 					<ChevronDown class="h-4 w-4 ml-1" />
@@ -57,28 +57,28 @@
 		{/if}
 
 		{#if $connectionStatus.error}
-			<div class="text-sm text-red-600">
+			<div class="text-sm text-error-500">
 				Error: {$connectionStatus.error}
 			</div>
 		{/if}
 	</div>
 
 	{#if showQuickConnect}
-		<div class="absolute top-full left-0 mt-2 bg-card border rounded-lg shadow-lg min-w-80 z-50">
-			<div class="p-3 border-b">
-				<h3 class="font-medium text-foreground">Quick Connect</h3>
+		<div class="card absolute top-full left-0 mt-2 shadow-lg min-w-80 z-50">
+			<div class="p-3 border-b border-surface-300-600">
+				<h3 class="font-medium">Quick Connect</h3>
 			</div>
 			<div class="max-h-64 overflow-y-auto">
 				{#each $connections as connection (connection.id)}
 					<button 
 						onclick={() => handleQuickConnect(connection)}
-						class="w-full px-3 py-2 text-left hover:bg-accent transition-colors border-b last:border-b-0"
+						class="w-full px-3 py-2 text-left hover:bg-surface-200-700 transition-colors border-b border-surface-300-600 last:border-b-0"
 					>
 						<div class="flex items-center gap-3">
-							<Database class="h-4 w-4 text-muted-foreground" />
+							<Database class="h-4 w-4 text-surface-500" />
 							<div class="flex-1">
-								<div class="font-medium text-foreground">{connection.name}</div>
-								<div class="text-sm text-muted-foreground">
+								<div class="font-medium">{connection.name}</div>
+								<div class="text-sm text-surface-500">
 									{connection.host}:{connection.port}/{connection.database}
 								</div>
 							</div>
@@ -86,10 +86,10 @@
 					</button>
 				{/each}
 			</div>
-			<div class="p-3 border-t">
+			<div class="p-3 border-t border-surface-300-600">
 				<button 
 					onclick={() => showQuickConnect = false}
-					class="btn btn-sm btn-outline w-full"
+					class="btn btn-sm btn-ghost-surface w-full"
 				>
 					Cancel
 				</button>

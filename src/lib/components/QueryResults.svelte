@@ -96,21 +96,21 @@
 			<pre class="mt-2 text-sm whitespace-pre-wrap font-mono">{error}</pre>
 		</div>
 	{:else if results.length > 0}
-		<div class="results-header flex items-center justify-between p-3 border-b bg-muted/30">
+		<div class="results-header flex items-center justify-between p-3 border-b bg-surface-200-700/30">
 			<div class="flex items-center gap-4 text-sm">
 				<span class="flex items-center gap-1.5">
 					<Table class="h-4 w-4" />
 					<strong>{actualRowCount}</strong> {actualRowCount === 1 ? 'row' : 'rows'}
 				</span>
 				{#if executionTime !== null}
-					<span class="text-muted-foreground">
+					<span class="text-surface-500">
 						{executionTime}ms
 					</span>
 				{/if}
 			</div>
 			<div class="flex items-center gap-2">
 				<button 
-					class="btn btn-sm btn-outline"
+					class="btn btn-sm btn-ghost-surface"
 					onclick={copyToClipboard}
 				>
 					{#if copied}
@@ -122,7 +122,7 @@
 					{/if}
 				</button>
 				<button 
-					class="btn btn-sm btn-outline"
+					class="btn btn-sm btn-ghost-surface"
 					onclick={downloadCsv}
 				>
 					<Download class="h-4 w-4 mr-2" />
@@ -133,12 +133,12 @@
 		
 		<div class="results-table-container overflow-auto max-h-[500px]">
 			<table class="results-table w-full">
-				<thead class="sticky top-0 bg-muted/50 backdrop-blur-sm">
+				<thead class="sticky top-0 bg-surface-200-700/50 backdrop-blur-sm">
 					<tr>
 						{#each Object.keys(results[0]) as column}
 							<th class="px-4 py-2 text-left text-sm font-medium text-foreground border-b">
 								{column}
-								<span class="ml-2 text-xs text-muted-foreground">
+								<span class="ml-2 text-xs text-surface-500">
 									{getColumnType(results.map(r => r[column]))}
 								</span>
 							</th>
@@ -147,19 +147,19 @@
 				</thead>
 				<tbody>
 					{#each results as row, i}
-						<tr class="hover:bg-muted/30 transition-colors">
+						<tr class="hover:bg-surface-200-700/30 transition-colors">
 							{#each Object.keys(results[0]) as column}
 								{@const value = row[column]}
 								{@const type = getColumnType([value])}
 								<td class="px-4 py-2 text-sm border-b font-mono {type === 'number' ? 'text-right' : ''}">
 									{#if value === null}
-										<span class="text-muted-foreground italic">NULL</span>
+										<span class="text-surface-500 italic">NULL</span>
 									{:else if type === 'boolean'}
 										<span class="font-semibold {value ? 'text-green-600' : 'text-red-600'}">
 											{value}
 										</span>
 									{:else if type === 'json'}
-										<pre class="text-xs bg-muted p-1 rounded max-w-xs overflow-auto">{JSON.stringify(value, null, 2)}</pre>
+										<pre class="text-xs bg-surface-200-700 p-1 rounded max-w-xs overflow-auto">{JSON.stringify(value, null, 2)}</pre>
 									{:else if type === 'date' || type === 'date-string'}
 										<span class="text-blue-600 dark:text-blue-400">
 											{new Date(value).toLocaleString()}
@@ -175,7 +175,7 @@
 			</table>
 		</div>
 	{:else}
-		<div class="p-8 text-center text-muted-foreground">
+		<div class="p-8 text-center text-surface-500">
 			<Table class="h-12 w-12 mx-auto mb-3 opacity-50" />
 			<p>No results to display</p>
 			<p class="text-sm mt-1">Run a query to see results here</p>

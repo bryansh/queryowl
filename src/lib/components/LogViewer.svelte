@@ -49,21 +49,21 @@
     </button>
     <button
       onclick={showLogPath}
-      class="bg-muted hover:bg-muted/80 text-muted-foreground text-xs px-3 py-1 rounded shadow-lg transition-colors"
+      class="bg-surface-200-700 hover:bg-surface-200-700/80 text-surface-500 text-xs px-3 py-1 rounded shadow-lg transition-colors"
       title="Show log file path"
     >
       📍 Path
     </button>
     
 {#if showPath}
-      <div class="bg-card border border-border rounded-lg shadow-xl p-4 max-w-sm backdrop-blur-sm">
+      <div class="card border border-border rounded-lg shadow-xl p-4 max-w-sm backdrop-blur-sm">
         <div class="flex items-center justify-between mb-2">
           <h3 class="text-sm font-semibold text-card-foreground flex items-center gap-1">
             📋 Log File Path
           </h3>
           <button 
             onclick={() => showPath = false}
-            class="text-muted-foreground hover:text-card-foreground rounded p-1 hover:bg-accent transition-colors"
+            class="text-surface-500 hover:text-card-foreground rounded p-1 hover:bg-accent transition-colors"
             aria-label="Close"
           >
             ✕
@@ -74,7 +74,7 @@
             {logPath}
           </p>
         </div>
-        <p class="text-xs text-muted-foreground">
+        <p class="text-xs text-surface-500">
           Click "📁 Logs" to open the folder containing this file.
         </p>
       </div>

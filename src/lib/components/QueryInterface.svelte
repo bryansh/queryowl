@@ -95,29 +95,29 @@
 	}
 </script>
 
-<div class="query-interface flex flex-col h-full">
+<div class="flex flex-col h-full">
 	<!-- Query editor toolbar -->
-	<div class="flex items-center justify-between px-4 py-3 border-b border-slate-600 bg-slate-800">
+	<div class="card flex items-center justify-between px-4 py-3 mb-4">
 		<div class="flex items-center gap-3">
 			<button 
 				onclick={() => showHistory = !showHistory}
-				class="btn btn-ghost btn-sm px-3 py-2"
+				class="btn btn-ghost-surface btn-sm px-3 py-2"
 			>
 				<History class="h-4 w-4 mr-2" />
 				History
 			</button>
 		</div>
-		<div class="text-xs text-slate-400">
-			Press <kbd class="px-2 py-1 bg-slate-700 text-slate-300 rounded text-xs">Cmd+Enter</kbd> to execute
+		<div class="text-xs text-surface-500">
+			Press <kbd class="px-2 py-1 bg-surface-200-700 text-surface-900-100 rounded text-xs">Cmd+Enter</kbd> to execute
 		</div>
 	</div>
 
 	<!-- Query History Dropdown -->
 	{#if showHistory}
-		<div class="query-history bg-slate-800 border border-slate-600 rounded-lg mx-4 my-2 shadow-xl">
-			<div class="flex items-center justify-between p-4 border-b border-slate-600">
-				<h3 class="font-medium text-slate-200">Query History</h3>
-				<button onclick={clearHistory} class="btn btn-ghost btn-sm">
+		<div class="card mx-4 mb-4 shadow-xl">
+			<div class="flex items-center justify-between p-4 border-b border-surface-300-600">
+				<h3 class="font-medium">Query History</h3>
+				<button onclick={clearHistory} class="btn btn-ghost-surface btn-sm">
 					Clear
 				</button>
 			</div>
@@ -126,7 +126,7 @@
 					<div class="space-y-1 max-h-64 overflow-y-auto">
 						{#each queryHistory as query, i}
 							<button
-								class="w-full text-left p-3 text-sm bg-slate-700 hover:bg-slate-600 rounded transition-colors font-mono text-slate-300"
+								class="w-full text-left p-3 text-sm bg-surface-200-700 hover:bg-surface-300-600 rounded transition-colors font-mono"
 								onclick={() => loadHistoryQuery(query)}
 							>
 								{getQueryPreview(query)}
@@ -135,7 +135,7 @@
 					</div>
 				</div>
 			{:else}
-				<div class="text-center py-8 text-slate-400">
+				<div class="text-center py-8 text-surface-500">
 					<FileText class="h-8 w-8 mx-auto mb-2 opacity-50" />
 					<p>No query history yet</p>
 				</div>
@@ -146,7 +146,7 @@
 	<!-- Main query interface split view -->
 	<div class="flex-1 flex flex-col">
 		<!-- SQL Editor -->
-		<div class="h-80 border-b">
+		<div class="h-80 mb-4">
 			<SqlEditor 
 				bind:this={sqlEditor}
 				height="100%"
@@ -167,13 +167,3 @@
 	</div>
 </div>
 
-<style>
-	.query-interface {
-		height: 100%;
-		min-height: 600px;
-	}
-	
-	.sql-editor, .query-results {
-		min-height: 200px;
-	}
-</style>

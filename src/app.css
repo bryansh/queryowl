@@ -1,19 +1,14 @@
-/* Clean slate - ready for Skeleton.dev */
-* {
-  box-sizing: border-box;
-}
+@import 'tailwindcss';
+@plugin '@tailwindcss/forms';
 
-html {
-  background: #0f172a;
-  color: #e2e8f0;
-}
+/* Skeleton imports */
+@import '@skeletonlabs/skeleton';
+@import '@skeletonlabs/skeleton/optional/presets';
+@import '@skeletonlabs/skeleton/themes/cerberus';
+@source '../node_modules/@skeletonlabs/skeleton-svelte/dist';
 
+/* App-specific styles */
 body {
-  background: #0f172a;
-  color: #e2e8f0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-  margin: 0;
-  padding: 0;
   width: 100vw;
   height: 100vh;
   overflow: hidden;

@@ -38,30 +38,30 @@
   }
 </script>
 
-<div class="w-full h-full bg-background flex overflow-hidden">
+<div class="w-full h-full flex overflow-hidden">
   <UpdateNotification />
   
-  <!-- Sidebar like Beekeeper Studio -->
-  <aside class="beekeeper-sidebar w-64 flex flex-col m-3 mr-1 rounded-lg">
+  <!-- Sidebar -->
+  <aside class="w-64 flex flex-col m-3 mr-1">
     <!-- Sidebar Header -->
-    <div class="px-4 py-6 border-b border-slate-600">
-      <h1 class="text-lg font-semibold text-white flex items-center gap-2">
+    <div class="card px-4 py-6 mb-4">
+      <h1 class="text-lg font-semibold flex items-center gap-2">
         🦉 QueryOwl
       </h1>
     </div>
     
     <!-- Navigation -->
-    <nav class="flex-1 p-4">
+    <nav class="card flex-1 p-4">
       <div class="space-y-2">
         <button
-          class="w-full text-left px-4 py-3 rounded-lg text-sm transition-colors {currentView === 'connections' ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-slate-600 text-slate-300'}"
+          class="btn w-full text-left px-4 py-3 text-sm {currentView === 'connections' ? 'btn-filled-primary' : 'btn-ghost-surface'}"
           onclick={() => currentView = "connections"}
         >
           <Database class="h-4 w-4 mr-3 inline" />
           Connections
         </button>
         <button
-          class="w-full text-left px-4 py-3 rounded-lg text-sm transition-colors {currentView === 'query' ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-slate-600 text-slate-300'} {!$activeConnection ? 'opacity-50 cursor-not-allowed' : ''}"
+          class="btn w-full text-left px-4 py-3 text-sm {currentView === 'query' ? 'btn-filled-primary' : 'btn-ghost-surface'} {!$activeConnection ? 'opacity-50 cursor-not-allowed' : ''}"
           onclick={() => currentView = "query"}
           disabled={!$activeConnection}
           title={!$activeConnection ? "Connect to a database first" : "Run SQL queries"}
@@ -72,25 +72,25 @@
       </div>
       
       <!-- Connection Status in Sidebar -->
-      <div class="mt-8 p-4 bg-slate-700 rounded-lg border border-slate-600">
+      <div class="mt-8">
         <ConnectionStatus />
       </div>
     </nav>
   </aside>
 
   <!-- Main content area -->
-  <div class="flex-1 flex flex-col min-h-0 m-3 ml-1 rounded-lg overflow-hidden">
+  <div class="flex-1 flex flex-col min-h-0 m-3 ml-1 overflow-hidden">
     <!-- Top toolbar -->
-    <header class="flex-shrink-0 bg-slate-800 flex items-center justify-between px-6 py-4 border-b border-slate-600">
+    <header class="card flex-shrink-0 flex items-center justify-between px-6 py-4 mb-4">
       <div class="flex items-center gap-4">
         {#if currentView === "query" && $activeConnection}
-          <span class="text-sm text-slate-300 font-medium">
+          <span class="text-sm font-medium">
             {$activeConnection.name} • {$activeConnection.database}
           </span>
         {:else if currentView === "connections"}
-          <span class="text-sm text-slate-300 font-medium">Manage Connections</span>
+          <span class="text-sm font-medium">Manage Connections</span>
         {:else}
-          <span class="text-sm text-slate-300 font-medium">Welcome to QueryOwl</span>
+          <span class="text-sm font-medium">Welcome to QueryOwl</span>
         {/if}
       </div>
       <div class="flex items-center gap-2">
@@ -99,16 +99,16 @@
     </header>
 
     <!-- Main content -->
-    <main class="flex-1 p-6 overflow-hidden min-h-0 bg-slate-900">
+    <main class="card flex-1 p-6 overflow-hidden min-h-0">
     {#if currentView === "home"}
       <div class="flex-1 flex items-center justify-center">
         <div class="max-w-md text-center space-y-8">
           <div class="space-y-4">
             <div class="text-6xl mb-4">🦉</div>
-            <h2 class="text-2xl font-bold text-slate-200">
+            <h2 class="text-2xl font-bold">
               Welcome to QueryOwl
             </h2>
-            <p class="text-slate-400">
+            <p class="text-surface-500">
               A powerful PostgreSQL database query tool
             </p>
           </div>
@@ -116,7 +116,7 @@
           <div class="space-y-3">
             <button 
               onclick={() => currentView = "connections"}
-              class="btn btn-primary w-full py-3 flex items-center justify-center gap-3"
+              class="btn btn-filled-primary w-full py-3 flex items-center justify-center gap-3"
             >
               <Database class="h-5 w-5" />
               Manage Connections
@@ -124,7 +124,7 @@
             <button 
               onclick={() => currentView = "query"}
               disabled={!$activeConnection}
-              class="btn btn-outline w-full py-3 flex items-center justify-center gap-3 {!$activeConnection ? 'btn-disabled' : ''}"
+              class="btn btn-ghost-surface w-full py-3 flex items-center justify-center gap-3 {!$activeConnection ? 'opacity-50 cursor-not-allowed' : ''}"
             >
               <FileText class="h-5 w-5" />
               {!$activeConnection ? "Connect to database first" : "Open Query Editor"}
@@ -166,17 +166,17 @@
 
 <!-- Log Path Dialog from Native Menu -->
 {#if showLogPath}
-  <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 9999;">
-    <div style="background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 8px; padding: 24px; max-width: 500px; margin: 16px; box-shadow: 0 20px 50px rgba(0,0,0,0.4);">
-      <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 16px; color: hsl(var(--foreground));">Log File Path</h3>
-      <div style="background: hsl(var(--muted)); padding: 12px; border-radius: 6px; font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 13px; word-break: break-all; margin-bottom: 16px; color: hsl(var(--foreground)); border: 1px solid hsl(var(--border));">
+  <div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+    <div class="card p-6 max-w-lg mx-4 shadow-2xl">
+      <h3 class="text-lg font-semibold mb-4">Log File Path</h3>
+      <div class="bg-surface-100-900 p-3 rounded-md font-mono text-sm break-all mb-4 border">
         {logPath}
       </div>
-      <div style="display: flex; gap: 12px;">
-        <button onclick={copyLogPath} style="background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; transition: all 0.2s;">
+      <div class="flex gap-3">
+        <button onclick={copyLogPath} class="btn btn-filled-primary">
           Copy Path
         </button>
-        <button onclick={() => showLogPath = false} style="background: transparent; color: hsl(var(--foreground)); padding: 8px 16px; border: 1px solid hsl(var(--border)); border-radius: 6px; cursor: pointer; font-weight: 500; transition: all 0.2s;">
+        <button onclick={() => showLogPath = false} class="btn btn-ghost-surface">
           Close
         </button>
       </div>

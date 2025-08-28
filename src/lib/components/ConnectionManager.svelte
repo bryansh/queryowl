@@ -5,12 +5,14 @@
 	import type { CreateConnectionRequest, UpdateConnectionRequest, TestConnectionRequest, TestConnectionResponse } from '$lib/types/database';
 	import { CONNECTION_COLORS, getRandomConnectionColor } from '$lib/utils/colors';
 	import { invoke } from '@tauri-apps/api/core';
+	import { Modal } from '@skeletonlabs/skeleton-svelte';
 
 	let showForm = $state(false);
 	let editingId = $state<string | null>(null);
 	let isLoading = $state(false);
 	let testResults = $state<Record<string, { success: boolean; error?: string }>>({});
-	let deleteConfirm = $state<{ show: boolean; id: string | null }>({ show: false, id: null });
+	let deleteModalOpen = $state(false);
+	let connectionToDelete = $state<string | null>(null);
 	
 	let formData = $state<CreateConnectionRequest>({
 		name: '',
@@ -55,22 +57,25 @@
 	}
 
 	function handleDelete(id: string) {
-		deleteConfirm = { show: true, id };
+		connectionToDelete = id;
+		deleteModalOpen = true;
 	}
 	
 	async function confirmDelete() {
-		if (deleteConfirm.id) {
+		if (connectionToDelete) {
 			try {
-				await deleteConnection(deleteConfirm.id);
+				await deleteConnection(connectionToDelete);
 			} catch (error) {
 				console.error('Failed to delete connection:', error);
 			}
 		}
-		deleteConfirm = { show: false, id: null };
+		deleteModalOpen = false;
+		connectionToDelete = null;
 	}
 	
 	function cancelDelete() {
-		deleteConfirm = { show: false, id: null };
+		deleteModalOpen = false;
+		connectionToDelete = null;
 	}
 
 	async function handleTest(connection: any) {
@@ -128,223 +133,225 @@
 	}
 </script>
 
-<div class="p-6 max-w-4xl mx-auto">
+<div class="p-6 max-w-6xl mx-auto">
 	<div class="flex items-center justify-between mb-6">
 		<div class="flex items-center gap-3">
-			<Database class="h-6 w-6 text-primary" />
-			<h1 class="text-2xl font-semibold text-foreground">Connection Manager</h1>
+			<Database class="h-6 w-6 text-primary-500" />
+			<h1 class="text-2xl font-semibold">Connection Manager</h1>
 		</div>
-		<button onclick={() => showForm = !showForm} class="btn btn-primary">
+		<button class="btn btn-filled-primary" onclick={() => showForm = !showForm}>
 			<Plus class="h-4 w-4 mr-2" />
 			Add Connection
 		</button>
 	</div>
 
 	{#if showForm}
-		<div class="bg-card border rounded-lg p-16 mb-6 w-full h-full min-h-[80vh]">
-			<div class="max-w-6xl mx-auto h-full flex flex-col">
-				<h2 class="text-4xl font-bold mb-12 text-foreground text-center">
-					{editingId ? 'Edit PostgreSQL Connection' : 'New PostgreSQL Connection'}
-				</h2>
-				<form onsubmit={handleSubmit} class="flex-1 flex flex-col justify-center space-y-16">
-					<!-- First Row -->
-					<div class="queryowl-form-grid">
-						<div class="queryowl-field">
-							<label class="queryowl-label">Connection Name</label>
-							<input 
-								bind:value={formData.name} 
-								placeholder="My Database"
-								required
-								class="queryowl-input"
-							/>
-						</div>
-						<div class="queryowl-field">
-							<label class="queryowl-label">Database Name</label>
-							<input 
-								bind:value={formData.database} 
-								placeholder="myapp_production"
-								required
-								class="queryowl-input"
-							/>
-						</div>
-						<div class="queryowl-field">
-							<label class="queryowl-label">Host</label>
-							<input 
-								bind:value={formData.host} 
-								placeholder="localhost"
-								required
-								class="queryowl-input"
-							/>
-						</div>
-					</div>
-					
-					<!-- Second Row -->
-					<div class="queryowl-form-grid">
-						<div class="queryowl-field">
-							<label class="queryowl-label">Port</label>
-							<input 
-								bind:value={formData.port} 
-								type="number"
-								placeholder="5432"
-								required
-								class="queryowl-input"
-							/>
-						</div>
-						<div class="queryowl-field">
-							<label class="queryowl-label">Username</label>
-							<input 
-								bind:value={formData.username} 
-								placeholder="postgres"
-								required
-								class="queryowl-input"
-							/>
-						</div>
-						<div class="queryowl-field">
-							<label class="queryowl-label">Password</label>
-							<input 
-								bind:value={formData.password} 
-								type="password"
-								placeholder={editingId ? "Enter password (required)" : "••••••••"}
-								required
-								class="queryowl-input"
-							/>
-						</div>
-					</div>
+		<div class="card p-8 mb-6">
+			<h2 class="text-2xl font-bold mb-6">
+				{editingId ? 'Edit PostgreSQL Connection' : 'New PostgreSQL Connection'}
+			</h2>
+			<form onsubmit={handleSubmit} class="space-y-6">
+				<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+					<label class="label">
+						<span>Connection Name</span>
+						<input 
+							bind:value={formData.name} 
+							placeholder="My Database"
+							required
+							class="input"
+							type="text"
+						/>
+					</label>
+					<label class="label">
+						<span>Database Name</span>
+						<input 
+							bind:value={formData.database} 
+							placeholder="myapp_production"
+							required
+							class="input"
+							type="text"
+						/>
+					</label>
+					<label class="label">
+						<span>Host</span>
+						<input 
+							bind:value={formData.host} 
+							placeholder="localhost"
+							required
+							class="input"
+							type="text"
+						/>
+					</label>
+				</div>
 				
-					<!-- Color Picker -->
-					<div>
-						<label class="queryowl-label">Connection Color</label>
-						<div class="flex flex-wrap gap-[2rem]">
+				<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+					<label class="label">
+						<span>Port</span>
+						<input 
+							bind:value={formData.port} 
+							type="number"
+							placeholder="5432"
+							required
+							class="input"
+						/>
+					</label>
+					<label class="label">
+						<span>Username</span>
+						<input 
+							bind:value={formData.username} 
+							placeholder="postgres"
+							required
+							class="input"
+							type="text"
+						/>
+					</label>
+					<label class="label">
+						<span>Password</span>
+						<input 
+							bind:value={formData.password} 
+							type="password"
+							placeholder={editingId ? "Enter password (required)" : "••••••••"}
+							required
+							class="input"
+						/>
+					</label>
+				</div>
+			
+				<div class="space-y-4">
+					<label class="label">
+						<span>Connection Color</span>
+						<div class="flex gap-2 mt-2">
 							{#each CONNECTION_COLORS as color}
 								<button
 									type="button"
-									class="w-[3rem] h-[3rem] rounded transition-all duration-200 hover:scale-105 cursor-pointer shadow-lg {formData.color === color ? 'ring-2 ring-blue-400' : ''}"
+									class="w-10 h-10 rounded-lg transition-all duration-200 hover:scale-110 {formData.color === color ? 'ring-2 ring-primary-500' : ''}"
 									style="background-color: {color};"
 									onclick={() => formData.color = color}
 									title={color}
 								></button>
 							{/each}
 						</div>
-					</div>
+					</label>
 					
-					<div class="flex items-center justify-center gap-6">
+					<label class="flex items-center space-x-2">
 						<input 
 							type="checkbox" 
 							bind:checked={formData.ssl} 
-							id="ssl"
-							class="rounded border-input w-8 h-8"
+							class="checkbox"
 						/>
-						<label for="ssl" class="queryowl-label">Use SSL</label>
-					</div>
-					
-					<div class="flex gap-8 pt-8 justify-center">
-						<button type="submit" disabled={isLoading} class="queryowl-button">
-							{#if isLoading}
-								<Loader2 class="h-6 w-6 mr-4 animate-spin" />
-							{/if}
-							{editingId ? 'Update Connection' : 'Save Connection'}
-						</button>
-						<button type="button" onclick={() => { showForm = false; resetForm(); }} class="queryowl-button queryowl-button-outline">
-							Cancel
-						</button>
-					</div>
-				</form>
-			</div>
+						<span>Use SSL</span>
+					</label>
+				</div>
+				
+				<div class="flex gap-4 pt-4">
+					<button type="submit" disabled={isLoading} class="btn btn-filled-primary">
+						{#if isLoading}
+							<Loader2 class="h-4 w-4 mr-2 animate-spin" />
+						{/if}
+						{editingId ? 'Update Connection' : 'Save Connection'}
+					</button>
+					<button type="button" onclick={() => { showForm = false; resetForm(); }} class="btn btn-ghost-surface">
+						Cancel
+					</button>
+				</div>
+			</form>
 		</div>
 	{/if}
 
 	{#if !showForm}
 		<div class="space-y-4">
 			{#each $connections as connection (connection.id)}
-			<div class="bg-card border rounded-lg p-4">
-				<div class="flex items-center justify-between">
-					<div class="flex-1">
-						<div class="flex items-center gap-3 mb-2">
-							<Database class="h-5 w-5 text-muted-foreground" />
-							<h3 class="font-medium text-foreground">{connection.name}</h3>
-						</div>
-						<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 text-sm text-muted-foreground">
-							<div>Host: {connection.host}:{connection.port}</div>
-							<div>Database: {connection.database}</div>
-							<div>User: {connection.username}</div>
-							<div>Last connected: {formatLastConnected(connection.last_connected)}</div>
-						</div>
-						{#if testResults[connection.id]}
-							<div class="mt-2 flex items-center gap-2">
-								{#if testResults[connection.id].success}
-									<CheckCircle class="h-4 w-4 text-green-500" />
-									<span class="text-sm text-green-600">Connection successful</span>
-								{:else}
-									<AlertCircle class="h-4 w-4 text-red-500" />
-									<span class="text-sm text-red-600">
-										{testResults[connection.id].error || 'Connection failed'}
-									</span>
-								{/if}
+				<div class="card p-4">
+					<div class="flex items-center justify-between">
+						<div class="flex-1">
+							<div class="flex items-center gap-3 mb-2">
+								<Database class="h-5 w-5 text-surface-500" />
+								<h3 class="font-medium">{connection.name}</h3>
 							</div>
-						{/if}
-					</div>
-					<div class="flex items-center gap-2">
-						<button 
-							onclick={() => handleTest(connection)}
-							title="Test Connection"
-							class="btn btn-sm btn-outline"
-						>
-							<TestTube class="h-4 w-4" />
-						</button>
-						<button 
-							onclick={() => handleConnect(connection)}
-							class="btn btn-sm btn-primary"
-						>
-							Connect
-						</button>
-						<button 
-							onclick={() => handleEdit(connection)}
-							title="Edit Connection"
-							class="btn btn-sm btn-outline"
-						>
-							<Edit class="h-4 w-4" />
-						</button>
-						<button 
-							onclick={() => handleDelete(connection.id)}
-							title="Delete Connection"
-							class="btn btn-sm btn-outline btn-error"
-						>
-							<Trash2 class="h-4 w-4" />
-						</button>
+							<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 text-sm text-surface-500">
+								<div>Host: {connection.host}:{connection.port}</div>
+								<div>Database: {connection.database}</div>
+								<div>User: {connection.username}</div>
+								<div>Last connected: {formatLastConnected(connection.last_connected)}</div>
+							</div>
+							{#if testResults[connection.id]}
+								<div class="mt-2 flex items-center gap-2">
+									{#if testResults[connection.id].success}
+										<CheckCircle class="h-4 w-4 text-success-500" />
+										<span class="text-sm text-success-600">Connection successful</span>
+									{:else}
+										<AlertCircle class="h-4 w-4 text-error-500" />
+										<span class="text-sm text-error-600">
+											{testResults[connection.id].error || 'Connection failed'}
+										</span>
+									{/if}
+								</div>
+							{/if}
+						</div>
+						<div class="flex items-center gap-2">
+							<button 
+								onclick={() => handleTest(connection)}
+								title="Test Connection"
+								class="btn btn-sm btn-ghost-surface"
+							>
+								<TestTube class="h-4 w-4" />
+							</button>
+							<button 
+								onclick={() => handleConnect(connection)}
+								class="btn btn-sm btn-filled-primary"
+							>
+								Connect
+							</button>
+							<button 
+								onclick={() => handleEdit(connection)}
+								title="Edit Connection"
+								class="btn btn-sm btn-ghost-surface"
+							>
+								<Edit class="h-4 w-4" />
+							</button>
+							<button 
+								onclick={() => handleDelete(connection.id)}
+								title="Delete Connection"
+								class="btn btn-sm btn-filled-error"
+							>
+								<Trash2 class="h-4 w-4" />
+							</button>
+						</div>
 					</div>
 				</div>
-			</div>
-		{:else}
-			<div class="text-center py-12">
-				<Database class="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-				<h3 class="text-lg font-medium text-foreground mb-2">No connections yet</h3>
-				<p class="text-muted-foreground mb-4">Add your first PostgreSQL connection to get started</p>
-				<button onclick={() => showForm = true} class="btn btn-primary">
-					<Plus class="h-4 w-4 mr-2" />
-					Add Connection
-				</button>
-			</div>
-		{/each}
+			{:else}
+				<div class="card text-center py-12">
+					<Database class="h-12 w-12 text-surface-500 mx-auto mb-4" />
+					<h3 class="text-lg font-medium mb-2">No connections yet</h3>
+					<p class="text-surface-500 mb-4">Add your first PostgreSQL connection to get started</p>
+					<button onclick={() => showForm = true} class="btn btn-filled-primary">
+						<Plus class="h-4 w-4 mr-2" />
+						Add Connection
+					</button>
+				</div>
+			{/each}
 		</div>
 	{/if}
 	
-	<!-- Delete Confirmation Dialog -->
-	{#if deleteConfirm.show}
-		<div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-			<div class="bg-card border rounded-lg p-6 max-w-md mx-4">
-				<h3 class="text-lg font-semibold text-foreground mb-4">Confirm Deletion</h3>
-				<p class="text-muted-foreground mb-6">
-					Are you sure you want to delete this connection? This action cannot be undone.
-				</p>
-				<div class="flex gap-3 justify-end">
-					<button onclick={cancelDelete} class="btn btn-outline">
-						Cancel
-					</button>
-					<button onclick={confirmDelete} class="btn btn-error">
-						Delete Connection
-					</button>
-				</div>
+	<!-- Delete Confirmation Modal -->
+	<Modal 
+		open={deleteModalOpen}
+		onOpenChange={(e) => (deleteModalOpen = e.open)}
+		contentBase="card bg-surface-100-900 p-6 space-y-4 shadow-xl max-w-md mx-4"
+	>
+		{#snippet content()}
+			<h3 class="text-lg font-semibold">Confirm Deletion</h3>
+			<p class="text-surface-500">
+				Are you sure you want to delete this connection? This action cannot be undone.
+			</p>
+			<div class="flex gap-3 justify-end">
+				<button onclick={cancelDelete} class="btn btn-ghost-surface">
+					Cancel
+				</button>
+				<button onclick={confirmDelete} class="btn btn-filled-error">
+					Delete Connection
+				</button>
 			</div>
-		</div>
-	{/if}
+		{/snippet}
+	</Modal>
 </div>

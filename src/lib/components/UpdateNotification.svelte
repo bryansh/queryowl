@@ -112,35 +112,35 @@
 </script>
 
 {#if showNotification}
-  <div class="fixed top-4 right-4 z-50 max-w-sm bg-card rounded-lg shadow-lg border border-border overflow-hidden">
+  <div class="fixed top-4 right-4 z-50 max-w-sm card shadow-lg overflow-hidden">
     <div class="p-4">
       <div class="flex items-start justify-between">
         <div class="flex-1 mr-3">
           {#if updateState === 'available'}
-            <h3 class="text-sm font-medium text-card-foreground">🦉 QueryOwl Update Available</h3>
-            <p class="mt-1 text-sm text-muted-foreground">
+            <h3 class="text-sm font-medium">🦉 QueryOwl Update Available</h3>
+            <p class="mt-1 text-sm text-surface-500">
               Version {update.version} is ready to install.
             </p>
           {:else if updateState === 'installing'}
-            <h3 class="text-sm font-medium text-card-foreground">📦 Installing Update</h3>
-            <p class="mt-1 text-sm text-muted-foreground">
+            <h3 class="text-sm font-medium">📦 Installing Update</h3>
+            <p class="mt-1 text-sm text-surface-500">
               {#if downloadProgress > 0}
                 Downloading... {downloadProgress.toFixed(0)}%
               {:else}
                 Preparing download...
               {/if}
             </p>
-            <div class="mt-2 w-full bg-secondary rounded-full h-2 overflow-hidden">
-              <div class="bg-primary h-2 rounded-full transition-all duration-300" style="width: {downloadProgress}%"></div>
+            <div class="mt-2 w-full bg-surface-300-600 rounded-full h-2 overflow-hidden">
+              <div class="bg-primary-500 h-2 rounded-full transition-all duration-300" style="width: {downloadProgress}%"></div>
             </div>
           {:else if updateState === 'complete'}
-            <h3 class="text-sm font-medium text-card-foreground">✅ Update Complete</h3>
-            <p class="mt-1 text-sm text-muted-foreground">
+            <h3 class="text-sm font-medium">✅ Update Complete</h3>
+            <p class="mt-1 text-sm text-surface-500">
               Restarting QueryOwl...
             </p>
           {:else if updateState === 'error'}
-            <h3 class="text-sm font-medium text-destructive">❌ Update Error</h3>
-            <p class="mt-1 text-sm text-muted-foreground">
+            <h3 class="text-sm font-medium text-error-500">❌ Update Error</h3>
+            <p class="mt-1 text-sm text-surface-500">
               {errorMessage}
             </p>
           {/if}
@@ -148,10 +148,10 @@
         
         <button
           onclick={dismissNotification}
-          class="flex-shrink-0 bg-secondary hover:bg-accent rounded p-1 focus:outline-none focus:ring-2 focus:ring-ring"
+          class="flex-shrink-0 btn-ghost-surface rounded p-1"
           aria-label="Dismiss notification"
         >
-          <svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-4 h-4 text-surface-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
@@ -161,13 +161,13 @@
         <div class="mt-3 flex space-x-2">
           <button
             onclick={installUpdate}
-            class="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium py-2 px-3 rounded focus:outline-none focus:ring-2 focus:ring-ring"
+            class="btn btn-filled-primary flex-1 text-sm py-2 px-3"
           >
             Install Now
           </button>
           <button
             onclick={dismissNotification}
-            class="flex-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground text-sm font-medium py-2 px-3 rounded focus:outline-none focus:ring-2 focus:ring-ring"
+            class="btn btn-ghost-surface flex-1 text-sm py-2 px-3"
           >
             Later
           </button>
