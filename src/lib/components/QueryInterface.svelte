@@ -97,7 +97,7 @@
 
 <div class="flex flex-col h-full">
 	<!-- Query editor toolbar -->
-	<div class="card flex items-center justify-between px-4 py-3 mb-4">
+	<div class="card flex items-center justify-between px-4 py-3 mb-2">
 		<div class="flex items-center gap-3">
 			<button 
 				onclick={() => showHistory = !showHistory}

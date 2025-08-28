@@ -133,8 +133,8 @@
 	}
 </script>
 
-<div class="p-6 max-w-6xl mx-auto">
-	<div class="flex items-center justify-between mb-6">
+<div class="p-6 pt-2 max-w-6xl mx-auto">
+	<div class="flex items-center justify-between mb-4">
 		<div class="flex items-center gap-3">
 			<Database class="h-6 w-6 text-primary-500" />
 			<h1 class="text-2xl font-semibold">Connection Manager</h1>

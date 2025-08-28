@@ -2,7 +2,8 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
-  import { Database, Settings, FileText } from "lucide-svelte";
+  import { Database, Settings, FileText, Menu } from "lucide-svelte";
+  import { Navigation } from '@skeletonlabs/skeleton-svelte';
   import ConnectionManager from "$lib/components/ConnectionManager.svelte";
   import ConnectionStatus from "$lib/components/ConnectionStatus.svelte";
   import UpdateNotification from "$lib/components/UpdateNotification.svelte";
@@ -14,6 +15,7 @@
   let currentView = $state("home"); // "home", "connections", "query"
   let showLogPath = $state(false);
   let logPath = $state("");
+  let isNavExpanded = $state(false);
 
   onMount(async () => {
     // Listen for menu events
@@ -41,47 +43,41 @@
 <div class="w-full h-full flex overflow-hidden">
   <UpdateNotification />
   
-  <!-- Sidebar -->
-  <aside class="w-64 flex flex-col m-3 mr-1">
-    <!-- Sidebar Header -->
-    <div class="card px-4 py-6 mb-4">
-      <h1 class="text-lg font-semibold flex items-center gap-2">
-        🦉 QueryOwl
-      </h1>
-    </div>
+  <!-- Navigation Rail -->
+  <Navigation.Rail 
+    expanded={false} 
+    value={currentView === "home" ? "" : currentView}
+    onValueChange={(newValue) => currentView = newValue || "home"}
+    classes="m-3 mr-1"
+  >
+    {#snippet header()}
+      <Navigation.Tile 
+        id="connections"
+        labelExpanded="Connections"
+        onclick={() => currentView = "connections"}
+        classes="flex items-center justify-center"
+      >
+        <Database />
+      </Navigation.Tile>
+      <Navigation.Tile 
+        id="query"
+        labelExpanded="Query Editor"
+        onclick={() => currentView = "query"}
+        disabled={!$activeConnection}
+        classes={`flex items-center justify-center ${!$activeConnection ? 'opacity-50 cursor-not-allowed' : ''}`}
+      >
+        <FileText />
+      </Navigation.Tile>
+    {/snippet}
     
-    <!-- Navigation -->
-    <nav class="card flex-1 p-4">
-      <div class="space-y-2">
-        <button
-          class="btn w-full text-left px-4 py-3 text-sm {currentView === 'connections' ? 'btn-filled-primary' : 'btn-ghost-surface'}"
-          onclick={() => currentView = "connections"}
-        >
-          <Database class="h-4 w-4 mr-3 inline" />
-          Connections
-        </button>
-        <button
-          class="btn w-full text-left px-4 py-3 text-sm {currentView === 'query' ? 'btn-filled-primary' : 'btn-ghost-surface'} {!$activeConnection ? 'opacity-50 cursor-not-allowed' : ''}"
-          onclick={() => currentView = "query"}
-          disabled={!$activeConnection}
-          title={!$activeConnection ? "Connect to a database first" : "Run SQL queries"}
-        >
-          <FileText class="h-4 w-4 mr-3 inline" />
-          Query Editor
-        </button>
-      </div>
-      
-      <!-- Connection Status in Sidebar -->
-      <div class="mt-8">
-        <ConnectionStatus />
-      </div>
-    </nav>
-  </aside>
+    {#snippet tiles()}
+    {/snippet}
+  </Navigation.Rail>
 
   <!-- Main content area -->
   <div class="flex-1 flex flex-col min-h-0 m-3 ml-1 overflow-hidden">
     <!-- Top toolbar -->
-    <header class="card flex-shrink-0 flex items-center justify-between px-6 py-4 mb-4">
+    <header class="card flex-shrink-0 flex items-center justify-between px-6 py-2 mb-2">
       <div class="flex items-center gap-4">
         {#if currentView === "query" && $activeConnection}
           <span class="text-sm font-medium">
@@ -99,9 +95,9 @@
     </header>
 
     <!-- Main content -->
-    <main class="card flex-1 p-6 overflow-hidden min-h-0">
+    <main class="card flex-1 overflow-hidden min-h-0">
     {#if currentView === "home"}
-      <div class="flex-1 flex items-center justify-center">
+      <div class="flex-1 flex items-center justify-center p-6">
         <div class="max-w-md text-center space-y-8">
           <div class="space-y-4">
             <div class="text-6xl mb-4">🦉</div>
@@ -183,4 +179,39 @@
     </div>
   </div>
 {/if}
+
+<style>
+  :global(.animate-fade-in) {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+  
+  @keyframes fadeIn {
+    from { 
+      opacity: 0; 
+      transform: translateX(-10px); 
+    }
+    to { 
+      opacity: 1; 
+      transform: translateX(0); 
+    }
+  }
+  
+  /* Force vertical stability for Navigation Tiles */
+  :global([data-navigation-tile]) {
+    height: 48px;
+    min-height: 48px;
+    max-height: 48px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    padding: 12px;
+  }
+  
+  :global([data-navigation-tile] svg) {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+  
+</style>
 
