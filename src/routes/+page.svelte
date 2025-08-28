@@ -8,7 +8,7 @@
   import ConnectionStatus from "$lib/components/ConnectionStatus.svelte";
   import UpdateNotification from "$lib/components/UpdateNotification.svelte";
   import QueryInterface from "$lib/components/QueryInterface.svelte";
-  import { connections, activeConnection } from '$lib/stores/connections';
+  import { connections, activeConnection, disconnectFromDatabase as disconnectDB } from '$lib/stores/connections';
 
   let name = $state("");
   let greetMsg = $state("");
@@ -16,6 +16,7 @@
   let showLogPath = $state(false);
   let logPath = $state("");
   let isNavExpanded = $state(false);
+  let showStatusMenu = $state(false);
 
   onMount(async () => {
     // Listen for menu events
@@ -24,8 +25,18 @@
       showLogPath = true;
     });
 
+    // Close status menu when clicking outside
+    const handleClickOutside = (event) => {
+      if (showStatusMenu && !event.target.closest('.status-menu-container')) {
+        showStatusMenu = false;
+      }
+    };
+    
+    document.addEventListener('click', handleClickOutside);
+
     return () => {
       unlistenLogPath();
+      document.removeEventListener('click', handleClickOutside);
     };
   });
 
@@ -37,6 +48,15 @@
   function copyLogPath() {
     navigator.clipboard.writeText(logPath);
     showLogPath = false;
+  }
+
+  async function handleDisconnect() {
+    try {
+      await disconnectDB();
+      showStatusMenu = false;
+    } catch (error) {
+      console.error('Failed to disconnect:', error);
+    }
   }
 </script>
 
@@ -84,7 +104,10 @@
             {$activeConnection.name} • {$activeConnection.database}
           </span>
         {:else if currentView === "connections"}
-          <span class="text-sm font-medium">Manage Connections</span>
+          <div class="flex items-center gap-3">
+            <Database class="h-8 w-8 text-primary-500" />
+            <h1 class="text-3xl font-semibold">Connection Manager</h1>
+          </div>
         {:else}
           <span class="text-sm font-medium">Welcome to QueryOwl</span>
         {/if}
@@ -95,7 +118,7 @@
     </header>
 
     <!-- Main content -->
-    <main class="card flex-1 overflow-hidden min-h-0">
+    <main class="card flex-1 overflow-auto min-h-0">
     {#if currentView === "home"}
       <div class="flex-1 flex items-center justify-center p-6">
         <div class="max-w-md text-center space-y-8">
@@ -135,27 +158,47 @@
     {/if}
     </main>
     
-  </div>
-</div>
-
-<!-- Floating Status bar at bottom like Beekeeper Studio -->
-<div 
-  style="position: fixed; bottom: 16px; left: 16px; right: 16px; z-index: 1000; background-color: {$activeConnection?.color || '#22c55e'};" 
-  class="text-white px-4 py-2 flex items-center justify-between text-sm font-medium rounded-lg shadow-lg"
->
-  <div class="flex items-center gap-3">
+    <!-- Status bar - only show when connected -->
     {#if $activeConnection}
-      <span>🦉 QueryOwl</span>
-      <span>•</span>
-      <span>Connected to {$activeConnection.name}</span>
-    {:else}
-      <span>🦉 QueryOwl</span>
-      <span>•</span>
-      <span>No database connected</span>
+      <div class="relative status-menu-container">
+        <div 
+          style="background-color: {$activeConnection.color || '#14b8a6'};" 
+          class="text-white px-4 py-2 flex items-center justify-between text-sm font-medium mt-2 animate-slide-up cursor-pointer hover:opacity-90 transition-opacity"
+          onclick={() => showStatusMenu = !showStatusMenu}
+        >
+          <div class="flex items-center gap-3">
+            <span>🦉 QueryOwl</span>
+            <span>•</span>
+            <span>Connected to {$activeConnection.name}</span>
+          </div>
+          <div class="flex items-center gap-2 text-xs">
+            <span>Ready</span>
+            <span class="ml-2">⌄</span>
+          </div>
+        </div>
+        
+        <!-- Context Menu -->
+        {#if showStatusMenu}
+          <div class="absolute bottom-full right-0 mb-2 bg-surface-100-900 border border-surface-300-600 rounded-lg shadow-lg z-50 min-w-[200px]">
+            <div class="py-2">
+              <button 
+                onclick={handleDisconnect}
+                class="w-full px-4 py-2 text-left text-sm hover:bg-surface-200-700 transition-colors flex items-center gap-3"
+              >
+                <span class="text-red-500">⏻</span>
+                Disconnect from {$activeConnection.name}
+              </button>
+              <hr class="border-surface-300-600 my-1" />
+              <div class="px-4 py-2 text-xs text-surface-500">
+                <div>Database: {$activeConnection.database}</div>
+                <div>Host: {$activeConnection.host}:{$activeConnection.port}</div>
+              </div>
+            </div>
+          </div>
+        {/if}
+      </div>
     {/if}
-  </div>
-  <div class="flex items-center gap-2 text-xs">
-    <span>Ready</span>
+    
   </div>
 </div>
 
@@ -211,6 +254,22 @@
     width: 20px;
     height: 20px;
     flex-shrink: 0;
+  }
+  
+  /* Status bar slide-up animation */
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  @keyframes slideUp {
+    from { 
+      transform: translateY(100%);
+      opacity: 0;
+    }
+    to { 
+      transform: translateY(0);
+      opacity: 1;
+    }
   }
   
 </style>

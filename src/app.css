@@ -7,6 +7,21 @@
 @import '@skeletonlabs/skeleton/themes/cerberus';
 @source '../node_modules/@skeletonlabs/skeleton-svelte/dist';
 
+/* Custom primary color theme - Teal */
+:root {
+  --color-primary-50: theme(colors.teal.50);
+  --color-primary-100: theme(colors.teal.100);
+  --color-primary-200: theme(colors.teal.200);
+  --color-primary-300: theme(colors.teal.300);
+  --color-primary-400: theme(colors.teal.400);
+  --color-primary-500: theme(colors.teal.500);
+  --color-primary-600: theme(colors.teal.600);
+  --color-primary-700: theme(colors.teal.700);
+  --color-primary-800: theme(colors.teal.800);
+  --color-primary-900: theme(colors.teal.900);
+  --color-primary-950: theme(colors.teal.950);
+}
+
 /* App-specific styles */
 body {
   width: 100vw;

@@ -17,6 +17,7 @@ struct DatabaseConnection {
     username: String,
     password: Option<String>,
     ssl: Option<bool>,
+    color: Option<String>,
     created_at: String,
     last_connected: Option<String>,
 }
@@ -30,6 +31,7 @@ struct CreateConnectionRequest {
     username: String,
     password: String,
     ssl: Option<bool>,
+    color: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -42,6 +44,7 @@ struct UpdateConnectionRequest {
     username: String,
     password: String,
     ssl: Option<bool>,
+    color: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -101,6 +104,7 @@ async fn save_connection(app: tauri::AppHandle, connection: CreateConnectionRequ
         username: connection.username,
         password: Some(encrypted_password),
         ssl: connection.ssl,
+        color: connection.color,
         created_at: chrono::Utc::now().to_rfc3339(),
         last_connected: None,
     };
@@ -169,6 +173,7 @@ async fn update_connection(app: tauri::AppHandle, connection: UpdateConnectionRe
             conn.username = connection.username;
             conn.password = Some(encrypted_password);
             conn.ssl = connection.ssl;
+            conn.color = connection.color;
             updated_connection = Some(conn.clone());
             break;
         }

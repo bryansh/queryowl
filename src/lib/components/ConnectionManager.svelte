@@ -134,11 +134,7 @@
 </script>
 
 <div class="p-6 pt-2 max-w-6xl mx-auto">
-	<div class="flex items-center justify-between mb-4">
-		<div class="flex items-center gap-3">
-			<Database class="h-6 w-6 text-primary-500" />
-			<h1 class="text-2xl font-semibold">Connection Manager</h1>
-		</div>
+	<div class="flex items-center justify-end mb-4">
 		<button class="btn btn-filled-primary" onclick={() => showForm = !showForm}>
 			<Plus class="h-4 w-4 mr-2" />
 			Add Connection
@@ -243,15 +239,15 @@
 					</label>
 				</div>
 				
-				<div class="flex gap-4 pt-4">
-					<button type="submit" disabled={isLoading} class="btn btn-filled-primary">
+				<div class="flex justify-between pt-4">
+					<button type="button" onclick={() => { showForm = false; resetForm(); }} class="btn btn-ghost-surface px-6 py-2 bg-surface-200-700 hover:bg-surface-300-600 border border-surface-300-600 rounded-lg transition-colors">
+						Cancel
+					</button>
+					<button type="submit" disabled={isLoading} class="btn btn-filled-primary px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors disabled:opacity-50">
 						{#if isLoading}
 							<Loader2 class="h-4 w-4 mr-2 animate-spin" />
 						{/if}
 						{editingId ? 'Update Connection' : 'Save Connection'}
-					</button>
-					<button type="button" onclick={() => { showForm = false; resetForm(); }} class="btn btn-ghost-surface">
-						Cancel
 					</button>
 				</div>
 			</form>
@@ -261,12 +257,16 @@
 	{#if !showForm}
 		<div class="space-y-4">
 			{#each $connections as connection (connection.id)}
-				<div class="card p-4" style="border-left: 5px solid {connection.color || '#22c55e'}; padding-left: calc(1rem - 5px);">
+				<div 
+					class="card p-4 cursor-pointer hover:bg-surface-200-700/50 transition-colors" 
+					style="border-left: 5px solid {connection.color || '#14b8a6'}; padding-left: calc(1rem - 5px);"
+					onclick={() => handleConnect(connection)}
+				>
 					<div class="flex items-center justify-between">
 						<div class="flex-1">
 							<div class="flex items-center gap-3 mb-2">
-								<Database class="h-5 w-5 text-surface-500" />
-								<h3 class="font-medium">{connection.name}</h3>
+								<Database class="h-6 w-6 text-surface-500" />
+								<h3 class="text-lg font-medium">{connection.name}</h3>
 							</div>
 							<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 text-sm text-surface-500">
 								<div>Host: {connection.host}:{connection.port}</div>
@@ -290,40 +290,40 @@
 						</div>
 						<div class="flex items-center gap-2">
 							<button 
-								onclick={() => handleTest(connection)}
+								onclick={(e) => { e.stopPropagation(); handleTest(connection); }}
 								title="Test Connection"
 								class="btn btn-sm btn-ghost-surface"
 							>
-								<TestTube class="h-4 w-4" />
+								<TestTube class="h-5 w-5" />
 							</button>
 							<button 
-								onclick={() => handleConnect(connection)}
+								onclick={(e) => { e.stopPropagation(); handleConnect(connection); }}
 								class="btn btn-sm btn-filled-primary"
 							>
 								Connect
 							</button>
 							<button 
-								onclick={() => handleEdit(connection)}
+								onclick={(e) => { e.stopPropagation(); handleEdit(connection); }}
 								title="Edit Connection"
 								class="btn btn-sm btn-ghost-surface"
 							>
-								<Edit class="h-4 w-4" />
+								<Edit class="h-5 w-5" />
 							</button>
 							<button 
-								onclick={() => handleDelete(connection.id)}
+								onclick={(e) => { e.stopPropagation(); handleDelete(connection.id); }}
 								title="Delete Connection"
 								class="btn btn-sm btn-filled-error"
 							>
-								<Trash2 class="h-4 w-4" />
+								<Trash2 class="h-5 w-5" />
 							</button>
 						</div>
 					</div>
 				</div>
 			{:else}
 				<div class="card text-center py-12">
-					<Database class="h-12 w-12 text-surface-500 mx-auto mb-4" />
-					<h3 class="text-lg font-medium mb-2">No connections yet</h3>
-					<p class="text-surface-500 mb-4">Add your first PostgreSQL connection to get started</p>
+					<Database class="h-16 w-16 text-surface-500 mx-auto mb-4" />
+					<h3 class="text-xl font-medium mb-2">No connections yet</h3>
+					<p class="text-base text-surface-500 mb-4">Add your first PostgreSQL connection to get started</p>
 					<button onclick={() => showForm = true} class="btn btn-filled-primary">
 						<Plus class="h-4 w-4 mr-2" />
 						Add Connection
