@@ -1,6 +1,7 @@
 <script>
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
+  import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
   import { onMount } from "svelte";
   import { Database, Settings, FileText, Menu, History, Table, Clock, Bookmark } from "lucide-svelte";
   import { Navigation } from '@skeletonlabs/skeleton-svelte';
@@ -28,6 +29,13 @@
   let isExecuting = $state(false);
 
   onMount(async () => {
+    // Restore window state on app launch
+    try {
+      await invoke('restore_window_state');
+    } catch (error) {
+      console.warn('Failed to restore window state:', error);
+    }
+    
     // Listen for menu events
     const unlistenLogPath = await listen("show_log_path", (event) => {
       logPath = event.payload;
@@ -42,10 +50,47 @@
     };
     
     document.addEventListener('click', handleClickOutside);
+    
+    // Save window state on window events
+    let saveTimeout = null;
+    const saveWindowState = () => {
+      if (saveTimeout) clearTimeout(saveTimeout);
+      saveTimeout = window.setTimeout(async () => {
+        try {
+          await invoke('save_window_state');
+        } catch (error) {
+          console.warn('Failed to save window state:', error);
+        }
+      }, 500); // Debounce saves
+    };
+    
+    // Listen for window resize and move events
+    window.addEventListener('resize', saveWindowState);
+    
+    // Listen to Tauri window events for more accurate state tracking
+    const currentWindow = getCurrentWebviewWindow();
+    const unlistenMoved = await currentWindow.listen('tauri://move', saveWindowState);
+    const unlistenResized = await currentWindow.listen('tauri://resize', saveWindowState);
+    
+    // Save state when app is about to close
+    const handleBeforeUnload = async () => {
+      try {
+        await invoke('save_window_state');
+      } catch (error) {
+        console.warn('Failed to save window state on close:', error);
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
       unlistenLogPath();
+      unlistenMoved();
+      unlistenResized();
       document.removeEventListener('click', handleClickOutside);
+      window.removeEventListener('resize', saveWindowState);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      if (saveTimeout) clearTimeout(saveTimeout);
     };
   });
 

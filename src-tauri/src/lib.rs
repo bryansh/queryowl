@@ -1,4 +1,4 @@
-use tauri::{Manager, Emitter, menu::*};
+use tauri::{Manager, Emitter, menu::*, PhysicalPosition, PhysicalSize};
 use tauri_plugin_store::StoreExt;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
@@ -477,6 +477,15 @@ struct SchemaSchema {
     owner: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct WindowState {
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+    maximized: bool,
+}
+
 #[derive(Debug, Serialize)]
 struct DatabaseSchema {
     tables: Vec<SchemaTable>,
@@ -797,6 +806,67 @@ async fn update_last_connected(app: tauri::AppHandle, id: String) -> Result<(), 
     Ok(())
 }
 
+#[tauri::command]
+async fn save_window_state(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_store::StoreExt;
+    
+    let store = app.store_builder("app_state.json").build()
+        .map_err(|e| format!("Failed to build store: {}", e))?;
+    
+    if let Some(window) = app.get_webview_window("main") {
+        let position = window.outer_position()
+            .map_err(|e| format!("Failed to get window position: {}", e))?;
+        let size = window.outer_size()
+            .map_err(|e| format!("Failed to get window size: {}", e))?;
+        let maximized = window.is_maximized()
+            .map_err(|e| format!("Failed to check if maximized: {}", e))?;
+        
+        let window_state = WindowState {
+            x: position.x,
+            y: position.y,
+            width: size.width,
+            height: size.height,
+            maximized,
+        };
+        
+        let value = serde_json::to_value(&window_state)
+            .map_err(|e| format!("Failed to serialize window state: {}", e))?;
+        store.set("window_state", value);
+        store.save()
+            .map_err(|e| format!("Failed to persist window state: {}", e))?;
+    }
+    
+    Ok(())
+}
+
+#[tauri::command]
+async fn restore_window_state(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_store::StoreExt;
+    
+    let store = app.store_builder("app_state.json").build()
+        .map_err(|e| format!("Failed to build store: {}", e))?;
+    
+    if let Some(window_state_value) = store.get("window_state") {
+        if let Ok(window_state) = serde_json::from_value::<WindowState>(window_state_value) {
+            if let Some(window) = app.get_webview_window("main") {
+                // Restore position and size
+                let position = PhysicalPosition::new(window_state.x, window_state.y);
+                let size = PhysicalSize::new(window_state.width, window_state.height);
+                
+                let _ = window.set_position(position);
+                let _ = window.set_size(size);
+                
+                // Restore maximized state
+                if window_state.maximized {
+                    let _ = window.maximize();
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -911,7 +981,9 @@ pub fn run() {
             disconnect_from_database,
             update_last_connected,
             get_database_schema,
-            get_table_columns
+            get_table_columns,
+            save_window_state,
+            restore_window_state
         ])
         .on_menu_event(|app, event| {
             match event.id().as_ref() {
