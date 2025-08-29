@@ -358,6 +358,26 @@
 			}
 		}
 	}
+	
+	// Handle saving a query
+	function handleSaveQuery(queryData: { name: string; sql: string; description?: string }) {
+		// Save to localStorage via SavedQueries structure
+		const savedQueries = JSON.parse(localStorage.getItem('queryowl_saved_queries') || '[]');
+		const newQuery = {
+			id: `query_${Date.now()}`,
+			name: queryData.name,
+			sql: queryData.sql,
+			description: queryData.description,
+			created_at: new Date().toISOString(),
+			updated_at: new Date().toISOString(),
+			connection_id: activeConnection?.id
+		};
+		savedQueries.push(newQuery);
+		localStorage.setItem('queryowl_saved_queries', JSON.stringify(savedQueries));
+		
+		// Show success notification (could be enhanced)
+		alert(`Query "${queryData.name}" saved successfully!`);
+	}
 </script>
 
 <div class="flex flex-col h-full">
@@ -420,6 +440,7 @@
 											onExecute={(sql) => executeQuery(tab.id, sql)}
 											onReady={() => handleEditorReady(tab.id)}
 											isExecuting={tab.isExecuting}
+											onSave={handleSaveQuery}
 										/>
 									</div>
 

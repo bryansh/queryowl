@@ -2,18 +2,19 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
-  import { Database, Settings, FileText, Menu, History, Table, Clock } from "lucide-svelte";
+  import { Database, Settings, FileText, Menu, History, Table, Clock, Bookmark } from "lucide-svelte";
   import { Navigation } from '@skeletonlabs/skeleton-svelte';
   import ConnectionManager from "$lib/components/ConnectionManager.svelte";
   import ConnectionStatus from "$lib/components/ConnectionStatus.svelte";
   import UpdateNotification from "$lib/components/UpdateNotification.svelte";
   import QueryInterface from "$lib/components/QueryInterface.svelte";
   import QueryHistory from "$lib/components/QueryHistory.svelte";
+  import SavedQueries from "$lib/components/SavedQueries.svelte";
   import { connections, activeConnection, disconnectFromDatabase as disconnectDB } from '$lib/stores/connections';
 
   let name = $state("");
   let greetMsg = $state("");
-  let currentView = $state("home"); // "home", "connections", "query", "history"
+  let currentView = $state("home"); // "home", "connections", "query", "history", "saved"
   let showLogPath = $state(false);
   let logPath = $state("");
   let isNavExpanded = $state(false);
@@ -143,6 +144,15 @@
       >
         <History />
       </Navigation.Tile>
+      <Navigation.Tile 
+        id="saved"
+        labelExpanded="Saved Queries"
+        onclick={() => currentView = "saved"}
+        disabled={!$activeConnection}
+        classes={`flex items-center justify-center ${!$activeConnection ? 'opacity-50 cursor-not-allowed' : ''}`}
+      >
+        <Bookmark />
+      </Navigation.Tile>
     {/snippet}
     
     {#snippet tiles()}
@@ -168,6 +178,11 @@
           <div class="flex items-center gap-3">
             <History class="h-8 w-8 text-primary-500" />
             <h1 class="text-3xl font-semibold">Query History</h1>
+          </div>
+        {:else if currentView === "saved"}
+          <div class="flex items-center gap-3">
+            <Bookmark class="h-8 w-8 text-primary-500" />
+            <h1 class="text-3xl font-semibold">Saved Queries</h1>
           </div>
         {/if}
       </div>
@@ -232,6 +247,8 @@
       />
     {:else if currentView === "history"}
       <QueryHistory activeConnection={$activeConnection} onRunQuery={handleRunQueryFromHistory} onEditQuery={handleEditQueryFromHistory} />
+    {:else if currentView === "saved"}
+      <SavedQueries activeConnection={$activeConnection} onRunQuery={handleRunQueryFromHistory} onEditQuery={handleEditQueryFromHistory} />
     {/if}
     </main>
     
