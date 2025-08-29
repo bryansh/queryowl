@@ -2,7 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
-  import { Database, Settings, FileText, Menu, History } from "lucide-svelte";
+  import { Database, Settings, FileText, Menu, History, Table, Clock } from "lucide-svelte";
   import { Navigation } from '@skeletonlabs/skeleton-svelte';
   import ConnectionManager from "$lib/components/ConnectionManager.svelte";
   import ConnectionStatus from "$lib/components/ConnectionStatus.svelte";
@@ -19,6 +19,12 @@
   let isNavExpanded = $state(false);
   let showStatusMenu = $state(false);
   let queryInterface;
+  
+  // Query results state for status bar
+  let queryResults = $state(null);
+  let queryError = $state(null);
+  let executionTime = $state(null);
+  let isExecuting = $state(false);
 
   onMount(async () => {
     // Listen for menu events
@@ -214,7 +220,16 @@
     {:else if currentView === "connections"}
       <ConnectionManager />
     {:else if currentView === "query"}
-      <QueryInterface bind:this={queryInterface} activeConnection={$activeConnection} />
+      <QueryInterface 
+        bind:this={queryInterface} 
+        activeConnection={$activeConnection} 
+        onResultsChange={(results, error, time, executing) => {
+          queryResults = results;
+          queryError = error;
+          executionTime = time;
+          isExecuting = executing;
+        }}
+      />
     {:else if currentView === "history"}
       <QueryHistory activeConnection={$activeConnection} onRunQuery={handleRunQueryFromHistory} onEditQuery={handleEditQueryFromHistory} />
     {/if}
@@ -229,12 +244,56 @@
           onclick={() => showStatusMenu = !showStatusMenu}
         >
           <div class="flex items-center gap-3">
-            <span>🦉 QueryOwl</span>
-            <span>•</span>
-            <span>Connected to {$activeConnection.name}</span>
+            <Database class="h-4 w-4" />
+            <span>{$activeConnection.name}</span>
+            {#if currentView === "query" && queryResults && queryResults.length > 0}
+              <span>•</span>
+              <div class="flex items-center gap-1">
+                <Table class="h-3 w-3" />
+                <span>{queryResults.length.toLocaleString()} {queryResults.length === 1 ? 'row' : 'rows'}</span>
+              </div>
+              {#if executionTime !== null}
+                <span>•</span>
+                <div class="flex items-center gap-1">
+                  <Clock class="h-3 w-3" />
+                  <span>{executionTime}ms</span>
+                </div>
+              {/if}
+            {:else if currentView === "query" && queryError}
+              <span>•</span>
+              <span class="text-red-300">Query failed</span>
+              {#if executionTime !== null}
+                <span>•</span>
+                <div class="flex items-center gap-1">
+                  <Clock class="h-3 w-3" />
+                  <span>{executionTime}ms</span>
+                </div>
+              {/if}
+            {:else if currentView === "query" && isExecuting}
+              <span>•</span>
+              <span>Executing...</span>
+            {/if}
           </div>
           <div class="flex items-center gap-2 text-xs">
-            <span>Ready</span>
+            {#if currentView === "query" && queryResults && queryResults.length > 0}
+              <!-- Copy and Export buttons -->
+              <button 
+                onclick={() => queryInterface?.copyResults()}
+                class="hover:bg-white/20 rounded px-2 py-1 transition-colors"
+                title="Copy results"
+              >
+                Copy
+              </button>
+              <button 
+                onclick={() => queryInterface?.exportResults()}
+                class="hover:bg-white/20 rounded px-2 py-1 transition-colors"
+                title="Export as CSV"
+              >
+                CSV
+              </button>
+              <span class="mx-1">|</span>
+            {/if}
+            <span>{currentView === "query" && isExecuting ? "Executing" : "Ready"}</span>
             <span class="ml-2">⌄</span>
           </div>
         </div>

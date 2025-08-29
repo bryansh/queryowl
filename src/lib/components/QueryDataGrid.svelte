@@ -133,46 +133,7 @@
 			<pre class="mt-4 text-base whitespace-pre-wrap font-mono bg-red-900/30 p-4 rounded-lg">{error}</pre>
 		</div>
 	{:else if data && data.length > 0}
-		<div class="toolbar flex items-center justify-between px-6 py-4 border-b border-slate-700 bg-slate-800">
-			<div class="flex items-center gap-5 text-base">
-				<span class="flex items-center gap-3 text-slate-300 font-medium">
-					<Table class="h-5 w-5 text-primary-500" />
-					<strong class="text-lg">{data.length.toLocaleString()}</strong> <span class="text-base">{data.length === 1 ? 'row' : 'rows'}</span>
-				</span>
-				{#if executionTime !== null}
-					<span class="text-slate-400 font-medium">
-						{executionTime}ms
-					</span>
-				{/if}
-				<span class="text-slate-500">•</span>
-				<span class="text-slate-400 text-sm">
-					Ready
-				</span>
-			</div>
-			
-			<div class="flex items-center gap-3">
-				<button 
-					onclick={copyToClipboard}
-					class="btn btn-ghost px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors"
-				>
-					{#if copied}
-						<CheckCircle class="h-5 w-5 mr-2 text-green-500" />
-						Copied
-					{:else}
-						<Copy class="h-5 w-5 mr-2" />
-						Copy
-					{/if}
-				</button>
-				<button 
-					onclick={exportToCsv}
-					class="btn btn-ghost px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors"
-				>
-					<Download class="h-5 w-5 mr-2" />
-					Export CSV
-				</button>
-			</div>
-		</div>
-		
+		<!-- Results Grid - no toolbar, status info moved to main status bar -->
 		<div class="flex-1 grid-container">
 			<Grid 
 				bind:this={grid}

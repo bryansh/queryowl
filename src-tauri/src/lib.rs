@@ -391,6 +391,384 @@ async fn disconnect_from_database() -> Result<(), String> {
     Ok(())
 }
 
+#[derive(Debug, Serialize)]
+struct SchemaTable {
+    table_name: String,
+    table_type: String,
+    column_count: i64,
+}
+
+#[derive(Debug, Serialize)]
+struct SchemaColumn {
+    column_name: String,
+    data_type: String,
+    is_nullable: String,
+    column_default: Option<String>,
+    is_primary_key: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct SchemaIndex {
+    index_name: String,
+    table_name: String,
+    column_names: Vec<String>,
+    is_unique: bool,
+    is_primary: bool,
+    index_type: String,
+}
+
+#[derive(Debug, Serialize)]
+struct SchemaFunction {
+    function_name: String,
+    schema_name: String,
+    return_type: String,
+    parameters: Vec<String>,
+    function_type: String, // FUNCTION or PROCEDURE
+}
+
+#[derive(Debug, Serialize)]
+struct SchemaTrigger {
+    trigger_name: String,
+    table_name: String,
+    event_manipulation: String, // INSERT, UPDATE, DELETE
+    action_timing: String, // BEFORE, AFTER
+    action_statement: String,
+}
+
+#[derive(Debug, Serialize)]
+struct SchemaSequence {
+    sequence_name: String,
+    data_type: String,
+    start_value: String,
+    increment: String,
+    max_value: String,
+    min_value: String,
+}
+
+#[derive(Debug, Serialize)]
+struct SchemaForeignKey {
+    constraint_name: String,
+    table_name: String,
+    column_name: String,
+    foreign_table_name: String,
+    foreign_column_name: String,
+    update_rule: String,
+    delete_rule: String,
+}
+
+#[derive(Debug, Serialize)]
+struct SchemaConstraint {
+    constraint_name: String,
+    table_name: String,
+    constraint_type: String, // CHECK, UNIQUE, PRIMARY KEY, FOREIGN KEY
+    column_names: Vec<String>,
+    check_clause: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct SchemaEnum {
+    type_name: String,
+    enum_values: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct SchemaSchema {
+    schema_name: String,
+    owner: String,
+}
+
+#[derive(Debug, Serialize)]
+struct DatabaseSchema {
+    tables: Vec<SchemaTable>,
+    views: Vec<SchemaTable>,
+    materialized_views: Vec<SchemaTable>,
+    indexes: Vec<SchemaIndex>,
+    functions: Vec<SchemaFunction>,
+    triggers: Vec<SchemaTrigger>,
+    sequences: Vec<SchemaSequence>,
+    foreign_keys: Vec<SchemaForeignKey>,
+    constraints: Vec<SchemaConstraint>,
+    enums: Vec<SchemaEnum>,
+    schemas: Vec<SchemaSchema>,
+}
+
+#[tauri::command]
+async fn get_database_schema(app: tauri::AppHandle, connection_id: String) -> Result<DatabaseSchema, String> {
+    println!("Fetching schema for connection: {}", connection_id);
+    
+    // Load connections from store to get the connection details
+    let store = app.store_builder("connections.json").build()
+        .map_err(|e| format!("Failed to build store: {}", e))?;
+    
+    let connections: Vec<DatabaseConnection> = store.get("connections")
+        .and_then(|value| serde_json::from_value(value).ok())
+        .unwrap_or_default();
+    
+    let connection = connections.iter()
+        .find(|c| c.id == connection_id)
+        .ok_or("Connection not found")?;
+    
+    // Decrypt password if it's encrypted
+    let password = match &connection.password {
+        Some(encrypted) if encryption::is_encrypted(encrypted) => {
+            encryption::decrypt_password(encrypted)?
+        },
+        Some(plain) => plain.clone(),
+        None => String::new(),
+    };
+    
+    let ssl_mode = if connection.ssl.unwrap_or(false) { "require" } else { "disable" };
+    
+    let config = format!(
+        "host={} port={} dbname={} user={} password={} sslmode={}",
+        connection.host,
+        connection.port,
+        connection.database,
+        connection.username,
+        password,
+        ssl_mode
+    );
+    
+    // Connect to database
+    let (client, conn) = tokio_postgres::connect(&config, tokio_postgres::NoTls).await
+        .map_err(|e| format!("Connection failed: {}", e))?;
+    
+    // Spawn connection handler
+    tokio::spawn(async move {
+        if let Err(e) = conn.await {
+            eprintln!("Connection error: {}", e);
+        }
+    });
+    
+    // Initialize collections for all entity types
+    let mut tables = Vec::new();
+    let mut views = Vec::new();
+    let mut materialized_views = Vec::new();
+    let mut indexes = Vec::new();
+    let mut functions = Vec::new();
+    let mut triggers = Vec::new();
+    let mut sequences = Vec::new();
+    let mut foreign_keys = Vec::new();
+    let mut constraints = Vec::new();
+    let mut enums = Vec::new();
+    let mut schemas = Vec::new();
+
+    // 1. Query for tables, views, and materialized views
+    let table_query = "
+        SELECT 
+            t.table_name,
+            t.table_type,
+            COUNT(c.column_name) as column_count
+        FROM information_schema.tables t
+        LEFT JOIN information_schema.columns c ON t.table_name = c.table_name 
+            AND t.table_schema = c.table_schema
+        WHERE t.table_schema NOT IN ('information_schema', 'pg_catalog')
+        GROUP BY t.table_name, t.table_type
+        ORDER BY t.table_type, t.table_name
+    ";
+    
+    let rows = client.query(table_query, &[]).await
+        .map_err(|e| format!("Schema query failed: {}", e))?;
+    
+    for row in rows {
+        let table_name: String = row.get(0);
+        let table_type: String = row.get(1);
+        let column_count: i64 = row.get(2);
+        
+        let schema_table = SchemaTable {
+            table_name,
+            table_type: table_type.clone(),
+            column_count,
+        };
+        
+        match table_type.as_str() {
+            "BASE TABLE" => tables.push(schema_table),
+            "VIEW" => views.push(schema_table),
+            "MATERIALIZED VIEW" => materialized_views.push(schema_table),
+            _ => {}
+        }
+    }
+
+    // 2. Query for indexes (simplified)
+    let index_query = "
+        SELECT 
+            indexname as index_name,
+            tablename as table_name,
+            indexdef
+        FROM pg_indexes 
+        WHERE schemaname = 'public'
+        ORDER BY tablename, indexname
+    ";
+    
+    let rows = client.query(index_query, &[]).await
+        .map_err(|e| format!("Index query failed: {}", e))?;
+    
+    for row in rows {
+        let index_name: String = row.get(0);
+        let table_name: String = row.get(1);
+        let _index_def: String = row.get(2);
+        
+        // Simple heuristics from index definition
+        let is_unique = _index_def.contains("UNIQUE");
+        let is_primary = _index_def.contains("PRIMARY KEY") || index_name.ends_with("_pkey");
+        let index_type = if is_primary { "btree".to_string() } else { "btree".to_string() };
+        
+        indexes.push(SchemaIndex {
+            index_name,
+            table_name,
+            column_names: vec![], // Simplified for now
+            is_unique,
+            is_primary,
+            index_type,
+        });
+    }
+
+    // 3. Query for functions and procedures (simplified)
+    let function_query = "
+        SELECT 
+            routine_name as function_name,
+            routine_schema as schema_name,
+            COALESCE(data_type, 'void') as return_type,
+            routine_type as function_type
+        FROM information_schema.routines 
+        WHERE routine_schema = 'public'
+        ORDER BY routine_name
+    ";
+    
+    let rows = client.query(function_query, &[]).await
+        .map_err(|e| format!("Function query failed: {}", e))?;
+    
+    for row in rows {
+        let function_name: String = row.get(0);
+        let schema_name: String = row.get(1);
+        let return_type: String = row.get(2);
+        let function_type: String = row.get(3);
+        
+        functions.push(SchemaFunction {
+            function_name,
+            schema_name,
+            return_type,
+            parameters: vec![], // Simplified for now
+            function_type,
+        });
+    }
+
+    // For now, let's comment out the complex queries to isolate the issue
+    // We'll just return tables and views first to see if those work
+    
+    // TODO: Add back other entity types once basic loading works
+
+    Ok(DatabaseSchema {
+        tables,
+        views,
+        materialized_views,
+        indexes,
+        functions,
+        triggers,
+        sequences,
+        foreign_keys,
+        constraints,
+        enums,
+        schemas,
+    })
+}
+
+#[tauri::command]
+async fn get_table_columns(app: tauri::AppHandle, connection_id: String, table_name: String) -> Result<Vec<SchemaColumn>, String> {
+    println!("Fetching columns for table: {} on connection: {}", table_name, connection_id);
+    
+    // Load connections from store to get the connection details
+    let store = app.store_builder("connections.json").build()
+        .map_err(|e| format!("Failed to build store: {}", e))?;
+    
+    let connections: Vec<DatabaseConnection> = store.get("connections")
+        .and_then(|value| serde_json::from_value(value).ok())
+        .unwrap_or_default();
+    
+    let connection = connections.iter()
+        .find(|c| c.id == connection_id)
+        .ok_or("Connection not found")?;
+    
+    // Decrypt password if it's encrypted
+    let password = match &connection.password {
+        Some(encrypted) if encryption::is_encrypted(encrypted) => {
+            encryption::decrypt_password(encrypted)?
+        },
+        Some(plain) => plain.clone(),
+        None => String::new(),
+    };
+    
+    let ssl_mode = if connection.ssl.unwrap_or(false) { "require" } else { "disable" };
+    
+    let config = format!(
+        "host={} port={} dbname={} user={} password={} sslmode={}",
+        connection.host,
+        connection.port,
+        connection.database,
+        connection.username,
+        password,
+        ssl_mode
+    );
+    
+    // Connect to database
+    let (client, conn) = tokio_postgres::connect(&config, tokio_postgres::NoTls).await
+        .map_err(|e| format!("Connection failed: {}", e))?;
+    
+    // Spawn connection handler
+    tokio::spawn(async move {
+        if let Err(e) = conn.await {
+            eprintln!("Connection error: {}", e);
+        }
+    });
+    
+    // Query for table columns with primary key information
+    let column_query = "
+        SELECT 
+            c.column_name,
+            c.data_type,
+            c.is_nullable,
+            c.column_default,
+            CASE WHEN pk.column_name IS NOT NULL THEN true ELSE false END as is_primary_key
+        FROM information_schema.columns c
+        LEFT JOIN (
+            SELECT kcu.column_name
+            FROM information_schema.table_constraints tc
+            JOIN information_schema.key_column_usage kcu 
+                ON tc.constraint_name = kcu.constraint_name
+                AND tc.table_schema = kcu.table_schema
+            WHERE tc.constraint_type = 'PRIMARY KEY'
+                AND tc.table_schema NOT IN ('information_schema', 'pg_catalog')
+                AND tc.table_name = $1
+        ) pk ON c.column_name = pk.column_name
+        WHERE c.table_schema NOT IN ('information_schema', 'pg_catalog') 
+            AND c.table_name = $1
+        ORDER BY c.ordinal_position
+    ";
+    
+    let rows = client.query(column_query, &[&table_name]).await
+        .map_err(|e| format!("Column query failed: {}", e))?;
+    
+    let mut columns = Vec::new();
+    
+    for row in rows {
+        let column_name: String = row.get(0);
+        let data_type: String = row.get(1);
+        let is_nullable: String = row.get(2);
+        let column_default: Option<String> = row.get(3);
+        let is_primary_key: bool = row.get(4);
+        
+        columns.push(SchemaColumn {
+            column_name,
+            data_type,
+            is_nullable,
+            column_default,
+            is_primary_key,
+        });
+    }
+    
+    Ok(columns)
+}
+
 #[tauri::command]
 async fn update_last_connected(app: tauri::AppHandle, id: String) -> Result<(), String> {
     use tauri_plugin_store::StoreExt;
@@ -531,7 +909,9 @@ pub fn run() {
             execute_query,
             connect_to_database,
             disconnect_from_database,
-            update_last_connected
+            update_last_connected,
+            get_database_schema,
+            get_table_columns
         ])
         .on_menu_event(|app, event| {
             match event.id().as_ref() {
