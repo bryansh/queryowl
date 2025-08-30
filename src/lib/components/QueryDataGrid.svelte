@@ -133,20 +133,37 @@
 			<pre class="mt-4 text-base whitespace-pre-wrap font-mono bg-red-900/30 p-4 rounded-lg">{error}</pre>
 		</div>
 	{:else if data && data.length > 0}
-		<!-- Results Grid - no toolbar, status info moved to main status bar -->
-		<div class="flex-1 grid-container">
-			<Grid 
-				bind:this={grid}
-				data={gridData} 
-				{columns}
-				resizable={true}
-				sortable={true}
-				filter={true}
-				select={true}
-				pager={true}
-				onClick={handleCellClick}
-			/>
-		</div>
+		<!-- Check if this is a success message for DDL/DML queries -->
+		{#if data.length === 1 && data[0].status === 'success'}
+			<div class="flex-1 flex items-center justify-center text-green-400">
+				<div class="text-center">
+					<CheckCircle class="h-16 w-16 mx-auto mb-4 text-green-500" />
+					<p class="text-xl font-medium">{data[0].query_type} Query Executed Successfully</p>
+					<p class="text-base mt-2 opacity-75">{data[0].message}</p>
+					{#if data[0].affected_rows > 0}
+						<p class="text-sm mt-1 opacity-60">{data[0].affected_rows} {data[0].affected_rows === 1 ? 'row' : 'rows'} affected</p>
+					{/if}
+					{#if executionTime !== null}
+						<p class="text-sm mt-1 opacity-60">Completed in {executionTime}ms</p>
+					{/if}
+				</div>
+			</div>
+		{:else}
+			<!-- Results Grid - no toolbar, status info moved to main status bar -->
+			<div class="flex-1 grid-container">
+				<Grid 
+					bind:this={grid}
+					data={gridData} 
+					{columns}
+					resizable={true}
+					sortable={true}
+					filter={true}
+					select={true}
+					pager={true}
+					onClick={handleCellClick}
+				/>
+			</div>
+		{/if}
 	{:else}
 		<div class="flex-1 flex items-center justify-center text-slate-400">
 			<div class="text-center">

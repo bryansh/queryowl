@@ -314,40 +314,82 @@ async fn execute_query(app: tauri::AppHandle, connection_id: String, sql: String
         }
     });
     
-    // Execute the query
-    let rows = client.query(&sql, &[]).await
-        .map_err(|e| format!("Query execution failed: {}", e))?;
+    // Detect if this is a SELECT query or a DDL/DML statement
+    let sql_trimmed = sql.trim().to_uppercase();
+    let is_select = sql_trimmed.starts_with("SELECT") || 
+                   sql_trimmed.starts_with("WITH") ||
+                   sql_trimmed.starts_with("SHOW") ||
+                   sql_trimmed.starts_with("EXPLAIN");
     
-    // Convert rows to JSON - simplified approach
     let mut results = Vec::new();
-    for row in rows {
-        let mut row_map = serde_json::Map::new();
+    
+    if is_select {
+        // Use query() for SELECT statements that return rows
+        let rows = client.query(&sql, &[]).await
+            .map_err(|e| format!("Query execution failed: {}", e))?;
         
-        for (i, column) in row.columns().iter().enumerate() {
-            let column_name = column.name();
+        // Convert rows to JSON - simplified approach
+        for row in rows {
+            let mut row_map = serde_json::Map::new();
             
-            // Try to get the value as different types, falling back to string
-            let value = if let Ok(v) = row.try_get::<_, Option<bool>>(i) {
-                v.map(serde_json::Value::Bool).unwrap_or(serde_json::Value::Null)
-            } else if let Ok(v) = row.try_get::<_, Option<i32>>(i) {
-                v.map(|n| serde_json::Value::Number(n.into())).unwrap_or(serde_json::Value::Null)
-            } else if let Ok(v) = row.try_get::<_, Option<i64>>(i) {
-                v.map(|n| serde_json::Value::Number(n.into())).unwrap_or(serde_json::Value::Null)
-            } else if let Ok(v) = row.try_get::<_, Option<f64>>(i) {
-                v.and_then(|n| serde_json::Number::from_f64(n))
-                 .map(serde_json::Value::Number)
-                 .unwrap_or(serde_json::Value::Null)
-            } else if let Ok(v) = row.try_get::<_, Option<String>>(i) {
-                v.map(serde_json::Value::String).unwrap_or(serde_json::Value::Null)
-            } else {
-                // For any other type, fallback to null (we can enhance this later)
-                serde_json::Value::Null
-            };
+            for (i, column) in row.columns().iter().enumerate() {
+                let column_name = column.name();
+                
+                // Try to get the value as different types, falling back to string
+                let value = if let Ok(v) = row.try_get::<_, Option<bool>>(i) {
+                    v.map(serde_json::Value::Bool).unwrap_or(serde_json::Value::Null)
+                } else if let Ok(v) = row.try_get::<_, Option<i32>>(i) {
+                    v.map(|n| serde_json::Value::Number(n.into())).unwrap_or(serde_json::Value::Null)
+                } else if let Ok(v) = row.try_get::<_, Option<i64>>(i) {
+                    v.map(|n| serde_json::Value::Number(n.into())).unwrap_or(serde_json::Value::Null)
+                } else if let Ok(v) = row.try_get::<_, Option<f64>>(i) {
+                    v.and_then(|n| serde_json::Number::from_f64(n))
+                     .map(serde_json::Value::Number)
+                     .unwrap_or(serde_json::Value::Null)
+                } else if let Ok(v) = row.try_get::<_, Option<String>>(i) {
+                    v.map(serde_json::Value::String).unwrap_or(serde_json::Value::Null)
+                } else {
+                    // For any other type, fallback to null (we can enhance this later)
+                    serde_json::Value::Null
+                };
+                
+                row_map.insert(column_name.to_string(), value);
+            }
             
-            row_map.insert(column_name.to_string(), value);
+            results.push(serde_json::Value::Object(row_map));
         }
+    } else {
+        // Use execute() for DDL/DML statements that don't return rows
+        let affected_rows = client.execute(&sql, &[]).await
+            .map_err(|e| format!("Query execution failed: {}", e))?;
         
-        results.push(serde_json::Value::Object(row_map));
+        // Return a success message with affected row count
+        let mut success_map = serde_json::Map::new();
+        success_map.insert("status".to_string(), serde_json::Value::String("success".to_string()));
+        success_map.insert("message".to_string(), serde_json::Value::String("Query executed successfully".to_string()));
+        success_map.insert("affected_rows".to_string(), serde_json::Value::Number(affected_rows.into()));
+        
+        // Determine query type for better messaging
+        let query_type = if sql_trimmed.starts_with("CREATE") {
+            "CREATE"
+        } else if sql_trimmed.starts_with("DROP") {
+            "DROP"
+        } else if sql_trimmed.starts_with("ALTER") {
+            "ALTER"
+        } else if sql_trimmed.starts_with("INSERT") {
+            "INSERT"
+        } else if sql_trimmed.starts_with("UPDATE") {
+            "UPDATE"
+        } else if sql_trimmed.starts_with("DELETE") {
+            "DELETE"
+        } else if sql_trimmed.starts_with("TRUNCATE") {
+            "TRUNCATE"
+        } else {
+            "DDL/DML"
+        };
+        
+        success_map.insert("query_type".to_string(), serde_json::Value::String(query_type.to_string()));
+        results.push(serde_json::Value::Object(success_map));
     }
     
     Ok(results)

@@ -278,10 +278,20 @@
             <span>{$activeConnection.name}</span>
             {#if currentView === "query" && queryResults && queryResults.length > 0}
               <span>•</span>
-              <div class="flex items-center gap-1">
-                <Table class="h-3 w-3" />
-                <span>{queryResults.length.toLocaleString()} {queryResults.length === 1 ? 'row' : 'rows'}</span>
-              </div>
+              {#if queryResults.length === 1 && queryResults[0].status === 'success'}
+                <!-- DDL/DML success message -->
+                <span class="text-green-300">{queryResults[0].query_type} successful</span>
+                {#if queryResults[0].affected_rows > 0}
+                  <span>•</span>
+                  <span>{queryResults[0].affected_rows} {queryResults[0].affected_rows === 1 ? 'row' : 'rows'} affected</span>
+                {/if}
+              {:else}
+                <!-- Regular SELECT results -->
+                <div class="flex items-center gap-1">
+                  <Table class="h-3 w-3" />
+                  <span>{queryResults.length.toLocaleString()} {queryResults.length === 1 ? 'row' : 'rows'}</span>
+                </div>
+              {/if}
               {#if executionTime !== null}
                 <span>•</span>
                 <div class="flex items-center gap-1">
@@ -305,8 +315,8 @@
             {/if}
           </div>
           <div class="flex items-center gap-2 text-xs">
-            {#if currentView === "query" && queryResults && queryResults.length > 0}
-              <!-- Copy and Export buttons -->
+            {#if currentView === "query" && queryResults && queryResults.length > 0 && !(queryResults.length === 1 && queryResults[0].status === 'success')}
+              <!-- Copy and Export buttons - only show for actual tabular results -->
               <button 
                 onclick={() => queryInterface?.copyResults()}
                 class="hover:bg-white/20 rounded px-2 py-1 transition-colors"
