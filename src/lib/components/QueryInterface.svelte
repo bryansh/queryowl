@@ -414,7 +414,7 @@
 						<div class="flex items-center border-b border-surface-300-600 bg-surface-50-950">
 							<div class="flex-1 flex items-center overflow-x-auto">
 								{#each tabs as tab (tab.id)}
-									<Tabs.Control value={tab.id}>
+									<Tabs.Control value={tab.id} class="group">
 										<div class="flex items-center gap-2 px-2">
 											<span class="text-sm font-medium">
 												{tab.title}
@@ -425,7 +425,7 @@
 											{#if tabs.length > 1}
 												<button
 													onclick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
-													class="opacity-0 group-hover:opacity-100 hover:bg-surface-300-700 rounded p-1 transition-opacity"
+													class="hover:bg-surface-300-700 rounded p-1 transition-all text-surface-400 hover:text-surface-200"
 													title="Close Tab"
 												>
 													<X class="h-3 w-3" />
