@@ -32,6 +32,7 @@
 	let editors: Record<string, SqlEditor> = {};
 	let tabs: QueryTab[] = $state([]);
 	let activeTabId: string = $state('');
+	let databaseSchema: any = $state(null);
 	
 	// Initialize tabs from storage or create default
 	function initializeTabs() {
@@ -73,6 +74,23 @@
 	
 	// Initialize tabs immediately
 	initializeTabs();
+	
+	// Load database schema when connection changes
+	$effect(async () => {
+		if (activeConnection) {
+			try {
+				databaseSchema = await invoke('get_database_schema', {
+					connectionId: activeConnection.id
+				});
+				console.log('Loaded database schema for autocomplete:', databaseSchema);
+			} catch (error) {
+				console.error('Failed to load database schema:', error);
+				databaseSchema = null;
+			}
+		} else {
+			databaseSchema = null;
+		}
+	});
 	
 	// Watch for tab changes to focus editor
 	$effect(() => {
@@ -441,6 +459,7 @@
 											onReady={() => handleEditorReady(tab.id)}
 											isExecuting={tab.isExecuting}
 											onSave={handleSaveQuery}
+											schema={databaseSchema}
 										/>
 									</div>
 

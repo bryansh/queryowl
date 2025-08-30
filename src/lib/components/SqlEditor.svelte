@@ -10,7 +10,8 @@
 		onExecute,
 		isExecuting = false,
 		onReady,
-		onSave
+		onSave,
+		schema
 	}: {
 		value?: string;
 		theme?: string;
@@ -19,6 +20,7 @@
 		isExecuting?: boolean;
 		onReady?: (() => void) | undefined;
 		onSave?: ((sql: string) => void) | undefined;
+		schema?: any;
 	} = $props();
 	
 	let container: HTMLDivElement;
@@ -32,36 +34,173 @@
 		// Load Monaco Editor
 		monaco = await loader.init();
 		
-		// Configure SQL language features
-		monaco.languages.registerCompletionItemProvider('sql', {
-			provideCompletionItems: (model: any, position: any) => {
-				const suggestions = [
-					// SQL Keywords
-					...['SELECT', 'FROM', 'WHERE', 'JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 
-					    'ON', 'GROUP BY', 'ORDER BY', 'HAVING', 'LIMIT', 'OFFSET', 'DISTINCT',
-					    'INSERT INTO', 'UPDATE', 'DELETE FROM', 'CREATE TABLE', 'DROP TABLE',
-					    'ALTER TABLE', 'CREATE INDEX', 'DROP INDEX', 'UNION', 'EXCEPT', 'INTERSECT',
-					    'AS', 'AND', 'OR', 'NOT', 'IN', 'EXISTS', 'BETWEEN', 'LIKE', 'IS NULL',
-					    'IS NOT NULL', 'COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'CASE', 'WHEN', 'THEN',
-					    'ELSE', 'END', 'CAST', 'COALESCE', 'NULLIF'].map(keyword => ({
-						label: keyword,
-						kind: monaco.languages.CompletionItemKind.Keyword,
-						insertText: keyword,
-						detail: 'SQL Keyword'
-					})),
-					// PostgreSQL specific functions
-					...['NOW()', 'CURRENT_DATE', 'CURRENT_TIME', 'CURRENT_TIMESTAMP',
-					    'date_trunc()', 'extract()', 'to_char()', 'to_date()', 'to_timestamp()',
-					    'array_agg()', 'string_agg()', 'json_build_object()', 'jsonb_build_object()',
-					    'row_number()', 'rank()', 'dense_rank()', 'lag()', 'lead()'].map(func => ({
-						label: func,
-						kind: monaco.languages.CompletionItemKind.Function,
-						insertText: func,
-						detail: 'PostgreSQL Function'
-					}))
-				];
-				
-				return { suggestions };
+		// Configure SQL language features with dynamic schema completion
+		let completionProvider: any = null;
+		
+		const registerCompletionProvider = () => {
+			// Dispose previous provider if exists
+			if (completionProvider) {
+				completionProvider.dispose();
+			}
+			
+			completionProvider = monaco.languages.registerCompletionItemProvider('sql', {
+				provideCompletionItems: (model: any, position: any) => {
+					// Get the text before the cursor to understand context
+					const textUntilPosition = model.getValueInRange({
+						startLineNumber: 1,
+						startColumn: 1,
+						endLineNumber: position.lineNumber,
+						endColumn: position.column,
+					});
+					
+					// Check if we're typing after a table name (for column suggestions)
+					const words = textUntilPosition.split(/\s+/);
+					const lastWord = words[words.length - 1];
+					const prevWord = words[words.length - 2];
+					
+					// Check for table.column pattern
+					const columnMatch = lastWord?.match(/^(\w+)\.$/); 
+					const tableName = columnMatch ? columnMatch[1] : null;
+					
+					let suggestions = [
+						// SQL Keywords
+						...['SELECT', 'FROM', 'WHERE', 'JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 
+						    'ON', 'GROUP BY', 'ORDER BY', 'HAVING', 'LIMIT', 'OFFSET', 'DISTINCT',
+						    'INSERT INTO', 'UPDATE', 'DELETE FROM', 'CREATE TABLE', 'DROP TABLE',
+						    'ALTER TABLE', 'CREATE INDEX', 'DROP INDEX', 'UNION', 'EXCEPT', 'INTERSECT',
+						    'AS', 'AND', 'OR', 'NOT', 'IN', 'EXISTS', 'BETWEEN', 'LIKE', 'IS NULL',
+						    'IS NOT NULL', 'COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'CASE', 'WHEN', 'THEN',
+						    'ELSE', 'END', 'CAST', 'COALESCE', 'NULLIF'].map(keyword => ({
+							label: keyword,
+							kind: monaco.languages.CompletionItemKind.Keyword,
+							insertText: keyword,
+							detail: 'SQL Keyword'
+						})),
+						// PostgreSQL specific functions
+						...['NOW()', 'CURRENT_DATE', 'CURRENT_TIME', 'CURRENT_TIMESTAMP',
+						    'date_trunc()', 'extract()', 'to_char()', 'to_date()', 'to_timestamp()',
+						    'array_agg()', 'string_agg()', 'json_build_object()', 'jsonb_build_object()',
+						    'row_number()', 'rank()', 'dense_rank()', 'lag()', 'lead()'].map(func => ({
+							label: func,
+							kind: monaco.languages.CompletionItemKind.Function,
+							insertText: func,
+							detail: 'PostgreSQL Function'
+						}))
+					];
+					
+					// If we're typing columns after a table name (e.g., "users."), show columns for that table
+					if (tableName && schema) {
+						suggestions = []; // Clear other suggestions to focus on columns
+						
+						// Find table and show its columns
+						const allTables = [...(schema.tables || []), ...(schema.views || []), ...(schema.materialized_views || [])];
+						const table = allTables.find((t: any) => t.table_name.toLowerCase() === tableName.toLowerCase());
+						
+						if (table) {
+							// We need to fetch columns for this specific table
+							// For now, we'll return a generic suggestion that columns are available
+							suggestions.push({
+								label: '*',
+								kind: monaco.languages.CompletionItemKind.Field,
+								insertText: '*',
+								detail: 'All columns',
+								documentation: `All columns from ${table.table_name} (${table.column_count} columns available)`
+							});
+							
+							// Add placeholder for common column names
+							const commonColumns = ['id', 'name', 'email', 'created_at', 'updated_at', 'deleted_at', 'status', 'type', 'description'];
+							suggestions.push(...commonColumns.map(col => ({
+								label: col,
+								kind: monaco.languages.CompletionItemKind.Field,
+								insertText: col,
+								detail: `Possible column from ${table.table_name}`,
+								documentation: 'Common column name - verify existence'
+							})));
+						}
+						return { suggestions };
+					}
+					
+					// Add database schema suggestions if available
+					if (schema) {
+						// Add tables
+						if (schema.tables) {
+							suggestions.push(...schema.tables.map((table: any) => ({
+								label: table.table_name,
+								kind: monaco.languages.CompletionItemKind.Class,
+								insertText: table.table_name,
+								detail: `Table (${table.column_count} columns)`,
+								documentation: `Base table with ${table.column_count} columns`
+							})));
+						}
+						
+						// Add views
+						if (schema.views) {
+							suggestions.push(...schema.views.map((view: any) => ({
+								label: view.table_name,
+								kind: monaco.languages.CompletionItemKind.Interface,
+								insertText: view.table_name,
+								detail: `View (${view.column_count} columns)`,
+								documentation: `Database view with ${view.column_count} columns`
+							})));
+						}
+						
+						// Add materialized views
+						if (schema.materialized_views) {
+							suggestions.push(...schema.materialized_views.map((mv: any) => ({
+								label: mv.table_name,
+								kind: monaco.languages.CompletionItemKind.Struct,
+								insertText: mv.table_name,
+								detail: `Materialized View (${mv.column_count} columns)`,
+								documentation: `Materialized view with ${mv.column_count} columns`
+							})));
+						}
+						
+						// Add functions
+						if (schema.functions) {
+							suggestions.push(...schema.functions.map((func: any) => ({
+								label: `${func.function_name}()`,
+								kind: monaco.languages.CompletionItemKind.Function,
+								insertText: `${func.function_name}()`,
+								detail: `${func.function_type} → ${func.return_type}`,
+								documentation: `Database ${func.function_type.toLowerCase()} returning ${func.return_type}`
+							})));
+						}
+						
+						// Add sequences
+						if (schema.sequences) {
+							suggestions.push(...schema.sequences.map((seq: any) => ({
+								label: seq.sequence_name,
+								kind: monaco.languages.CompletionItemKind.Constant,
+								insertText: seq.sequence_name,
+								detail: `Sequence (${seq.data_type})`,
+								documentation: `Database sequence of type ${seq.data_type}`
+							})));
+						}
+						
+						// Add enums
+						if (schema.enums) {
+							suggestions.push(...schema.enums.map((enumType: any) => ({
+								label: enumType.type_name,
+								kind: monaco.languages.CompletionItemKind.Enum,
+								insertText: enumType.type_name,
+								detail: `Enum (${enumType.enum_values.length} values)`,
+								documentation: `Enum type: ${enumType.enum_values.join(', ')}`
+							})));
+						}
+					}
+					
+					return { suggestions };
+				}
+			});
+		};
+		
+		// Initial registration
+		registerCompletionProvider();
+		
+		// Re-register when schema changes
+		$effect(() => {
+			if (monaco && schema) {
+				registerCompletionProvider();
 			}
 		});
 		

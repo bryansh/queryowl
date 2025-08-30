@@ -15,7 +15,7 @@
 
   let name = $state("");
   let greetMsg = $state("");
-  let currentView = $state("home"); // "home", "connections", "query", "history", "saved"
+  let currentView = $state("connections"); // "connections", "query", "history", "saved"
   let showLogPath = $state(false);
   let logPath = $state("");
   let isNavExpanded = $state(false);
@@ -158,8 +158,8 @@
   <!-- Navigation Rail -->
   <Navigation.Rail 
     expanded={false} 
-    value={currentView === "home" ? "" : currentView}
-    onValueChange={(newValue) => currentView = newValue || "home"}
+    value={currentView}
+    onValueChange={(newValue) => currentView = newValue || "connections"}
     classes="m-3 mr-1"
   >
     {#snippet header()}
@@ -245,39 +245,7 @@
 
     <!-- Main content -->
     <main class="card flex-1 overflow-auto min-h-0">
-    {#if currentView === "home"}
-      <div class="flex-1 flex items-center justify-center p-6">
-        <div class="max-w-md text-center space-y-8">
-          <div class="space-y-4">
-            <div class="text-6xl mb-4">🦉</div>
-            <h2 class="text-2xl font-bold">
-              Welcome to QueryOwl
-            </h2>
-            <p class="text-surface-500">
-              A powerful PostgreSQL database query tool
-            </p>
-          </div>
-          
-          <div class="space-y-3">
-            <button 
-              onclick={() => currentView = "connections"}
-              class="btn btn-filled-primary w-full py-3 flex items-center justify-center gap-3"
-            >
-              <Database class="h-5 w-5" />
-              Manage Connections
-            </button>
-            <button 
-              onclick={() => currentView = "query"}
-              disabled={!$activeConnection}
-              class="btn btn-ghost-surface w-full py-3 flex items-center justify-center gap-3 {!$activeConnection ? 'opacity-50 cursor-not-allowed' : ''}"
-            >
-              <FileText class="h-5 w-5" />
-              {!$activeConnection ? "Connect to database first" : "Open Query Editor"}
-            </button>
-          </div>
-        </div>
-      </div>
-    {:else if currentView === "connections"}
+    {#if currentView === "connections"}
       <ConnectionManager />
     {:else if currentView === "query"}
       <QueryInterface 
