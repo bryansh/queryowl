@@ -29,14 +29,13 @@
 	let showSaveDialog = $state(false);
 	let queryName = $state('');
 	let queryDescription = $state('');
+	let completionProvider: any = null;
 	
 	onMount(async () => {
 		// Load Monaco Editor
 		monaco = await loader.init();
 		
 		// Configure SQL language features with dynamic schema completion
-		let completionProvider: any = null;
-		
 		const registerCompletionProvider = () => {
 			// Dispose previous provider if exists
 			if (completionProvider) {
@@ -196,13 +195,6 @@
 		
 		// Initial registration
 		registerCompletionProvider();
-		
-		// Re-register when schema changes
-		$effect(() => {
-			if (monaco && schema) {
-				registerCompletionProvider();
-			}
-		});
 		
 		// Create editor instance
 		editor = monaco.editor.create(container, {
