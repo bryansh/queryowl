@@ -280,7 +280,7 @@
               <span>•</span>
               {#if queryResults.length === 1 && queryResults[0].status === 'success'}
                 <!-- DDL/DML success message -->
-                <span class="text-green-300">{queryResults[0].query_type} successful</span>
+                <span class="text-primary-300">{queryResults[0].query_type} successful</span>
                 {#if queryResults[0].affected_rows > 0}
                   <span>•</span>
                   <span>{queryResults[0].affected_rows} {queryResults[0].affected_rows === 1 ? 'row' : 'rows'} affected</span>

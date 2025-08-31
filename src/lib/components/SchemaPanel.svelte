@@ -142,6 +142,12 @@
 			loading = false;
 		}
 	}
+
+	// Export function to allow external refresh
+	export async function refreshSchema() {
+		console.log('SchemaPanel: Refreshing schema...');
+		await loadSchema();
+	}
 	
 	async function toggleTable(tableName: string) {
 		if (expandedTables.has(tableName)) {

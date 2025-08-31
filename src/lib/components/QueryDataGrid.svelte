@@ -4,11 +4,13 @@
 	
 	let {
 		data = [],
+		metadata = null,
 		error = null,
 		executionTime = null,
 		maxHeight = '500px'
 	}: {
 		data?: any[];
+		metadata?: any;
 		error?: string | null;
 		executionTime?: number | null;
 		maxHeight?: string;
@@ -121,6 +123,11 @@
 			}
 		}
 	}
+
+	// Check if a query type affects database schema
+	function isSchemaAffectingQuery(queryType: string): boolean {
+		return ['CREATE', 'DROP', 'ALTER', 'TRUNCATE'].includes(queryType);
+	}
 </script>
 
 <div class="query-data-grid h-full flex flex-col bg-background">
@@ -135,9 +142,9 @@
 	{:else if data && data.length > 0}
 		<!-- Check if this is a success message for DDL/DML queries -->
 		{#if data.length === 1 && data[0].status === 'success'}
-			<div class="flex-1 flex items-center justify-center text-green-400">
+			<div class="flex-1 flex items-center justify-center text-primary-400">
 				<div class="text-center">
-					<CheckCircle class="h-16 w-16 mx-auto mb-4 text-green-500" />
+					<CheckCircle class="h-16 w-16 mx-auto mb-4 text-primary-500" />
 					<p class="text-xl font-medium">{data[0].query_type} Query Executed Successfully</p>
 					<p class="text-base mt-2 opacity-75">{data[0].message}</p>
 					{#if data[0].affected_rows > 0}
@@ -146,22 +153,37 @@
 					{#if executionTime !== null}
 						<p class="text-sm mt-1 opacity-60">Completed in {executionTime}ms</p>
 					{/if}
+					{#if isSchemaAffectingQuery(data[0].query_type)}
+						<p class="text-xs mt-2 opacity-50 text-primary-300">Schema refreshed automatically</p>
+					{/if}
 				</div>
 			</div>
 		{:else}
-			<!-- Results Grid - no toolbar, status info moved to main status bar -->
-			<div class="flex-1 grid-container">
-				<Grid 
-					bind:this={grid}
-					data={gridData} 
-					{columns}
-					resizable={true}
-					sortable={true}
-					filter={true}
-					select={true}
-					pager={true}
-					onClick={handleCellClick}
-				/>
+			<!-- Results Grid with optional limit warning -->
+			<div class="flex-1 flex flex-col">
+				{#if metadata && metadata.limit_applied}
+					<div class="p-3 bg-yellow-900/20 text-yellow-400 border-b border-yellow-800 flex items-center gap-3">
+						<AlertCircle class="h-5 w-5 flex-shrink-0" />
+						<div class="flex-1">
+							<span class="font-medium">Results Limited:</span>
+							Showing {metadata.returned_rows.toLocaleString()} of {metadata.total_rows.toLocaleString()} rows
+							<span class="text-yellow-300">(limit: {metadata.result_limit.toLocaleString()})</span>
+						</div>
+					</div>
+				{/if}
+				<div class="flex-1 grid-container">
+					<Grid 
+						bind:this={grid}
+						data={gridData} 
+						{columns}
+						resizable={true}
+						sortable={true}
+						filter={true}
+						select={true}
+						pager={true}
+						onClick={handleCellClick}
+					/>
+				</div>
 			</div>
 		{/if}
 	{:else}

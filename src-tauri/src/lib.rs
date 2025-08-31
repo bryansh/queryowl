@@ -1,5 +1,7 @@
 use tauri::{Manager, Emitter, menu::*, PhysicalPosition, PhysicalSize};
 use tauri_plugin_store::StoreExt;
+use std::fs::File;
+use std::io::{Write, BufWriter};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use std::collections::HashMap;
@@ -266,7 +268,7 @@ async fn test_stored_connection(connection: DatabaseConnection) -> Result<TestCo
 }
 
 #[tauri::command]
-async fn execute_query(app: tauri::AppHandle, connection_id: String, sql: String) -> Result<Vec<serde_json::Value>, String> {
+async fn execute_query(app: tauri::AppHandle, connection_id: String, sql: String, limit: Option<u32>) -> Result<serde_json::Value, String> {
     println!("Executing query for connection: {}", connection_id);
     println!("SQL: {}", sql);
     
@@ -321,15 +323,30 @@ async fn execute_query(app: tauri::AppHandle, connection_id: String, sql: String
                    sql_trimmed.starts_with("SHOW") ||
                    sql_trimmed.starts_with("EXPLAIN");
     
+    let result_limit = limit.unwrap_or(1000); // Default limit of 1000 rows
     let mut results = Vec::new();
+    let mut metadata = serde_json::Map::new();
     
     if is_select {
         // Use query() for SELECT statements that return rows
         let rows = client.query(&sql, &[]).await
             .map_err(|e| format!("Query execution failed: {}", e))?;
         
+        let total_rows = rows.len();
+        let limited_rows = if total_rows > result_limit as usize {
+            &rows[0..result_limit as usize]
+        } else {
+            &rows[..]
+        };
+        
+        // Add metadata about the results
+        metadata.insert("total_rows".to_string(), serde_json::Value::Number(total_rows.into()));
+        metadata.insert("returned_rows".to_string(), serde_json::Value::Number(limited_rows.len().into()));
+        metadata.insert("limit_applied".to_string(), serde_json::Value::Bool(total_rows > result_limit as usize));
+        metadata.insert("result_limit".to_string(), serde_json::Value::Number(result_limit.into()));
+        
         // Convert rows to JSON - simplified approach
-        for row in rows {
+        for row in limited_rows {
             let mut row_map = serde_json::Map::new();
             
             for (i, column) in row.columns().iter().enumerate() {
@@ -392,7 +409,253 @@ async fn execute_query(app: tauri::AppHandle, connection_id: String, sql: String
         results.push(serde_json::Value::Object(success_map));
     }
     
-    Ok(results)
+    // Return results with metadata
+    let mut response = serde_json::Map::new();
+    response.insert("results".to_string(), serde_json::Value::Array(results));
+    response.insert("metadata".to_string(), serde_json::Value::Object(metadata));
+    
+    Ok(serde_json::Value::Object(response))
+}
+
+#[tauri::command]
+async fn export_query_stream(
+    app: tauri::AppHandle,
+    connection_id: String,
+    sql: String,
+    output_path: String,
+    format: String,
+    options: serde_json::Value,
+) -> Result<String, String> {
+    println!("Streaming export to: {}", output_path);
+    
+    // Load connection details
+    let store = app.store_builder("connections.json").build()
+        .map_err(|e| format!("Failed to build store: {}", e))?;
+    
+    let connections: Vec<DatabaseConnection> = store.get("connections")
+        .and_then(|value| serde_json::from_value(value).ok())
+        .unwrap_or_default();
+    
+    let connection = connections.iter()
+        .find(|c| c.id == connection_id)
+        .ok_or("Connection not found")?;
+    
+    // Decrypt password if needed
+    let password = match &connection.password {
+        Some(encrypted) if encryption::is_encrypted(encrypted) => {
+            encryption::decrypt_password(encrypted)?
+        },
+        Some(plain) => plain.clone(),
+        None => String::new(),
+    };
+    
+    let ssl_mode = if connection.ssl.unwrap_or(false) { "require" } else { "disable" };
+    
+    let config = format!(
+        "host={} port={} dbname={} user={} password={} sslmode={}",
+        connection.host,
+        connection.port,
+        connection.database,
+        connection.username,
+        password,
+        ssl_mode
+    );
+    
+    // Connect to database
+    let (client, conn) = tokio_postgres::connect(&config, tokio_postgres::NoTls).await
+        .map_err(|e| format!("Connection failed: {}", e))?;
+    
+    tokio::spawn(async move {
+        if let Err(e) = conn.await {
+            eprintln!("Connection error: {}", e);
+        }
+    });
+    
+    // Execute query and stream results to file
+    let rows = client.query(&sql, &[]).await
+        .map_err(|e| format!("Query execution failed: {}", e))?;
+    
+    // Create output file
+    let file = File::create(&output_path)
+        .map_err(|e| format!("Failed to create file: {}", e))?;
+    let mut writer = BufWriter::new(file);
+    
+    let include_headers = options.get("includeHeaders")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
+    
+    let quote_all = options.get("quoteAllValues")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    
+    if format == "csv" {
+        // Write CSV
+        if rows.len() > 0 && include_headers {
+            // Write headers
+            let headers: Vec<String> = rows[0].columns()
+                .iter()
+                .map(|col| col.name().to_string())
+                .collect();
+            writeln!(writer, "{}", headers.join(","))
+                .map_err(|e| format!("Failed to write headers: {}", e))?;
+        }
+        
+        // Write rows
+        for row in &rows {
+            let mut values = Vec::new();
+            for (i, _column) in row.columns().iter().enumerate() {
+                let value_str = if let Ok(v) = row.try_get::<_, Option<String>>(i) {
+                    v.unwrap_or_else(|| "NULL".to_string())
+                } else if let Ok(v) = row.try_get::<_, Option<i32>>(i) {
+                    v.map(|n| n.to_string()).unwrap_or_else(|| "NULL".to_string())
+                } else if let Ok(v) = row.try_get::<_, Option<i64>>(i) {
+                    v.map(|n| n.to_string()).unwrap_or_else(|| "NULL".to_string())
+                } else if let Ok(v) = row.try_get::<_, Option<f64>>(i) {
+                    v.map(|n| n.to_string()).unwrap_or_else(|| "NULL".to_string())
+                } else if let Ok(v) = row.try_get::<_, Option<bool>>(i) {
+                    v.map(|b| b.to_string()).unwrap_or_else(|| "NULL".to_string())
+                } else {
+                    "NULL".to_string()
+                };
+                
+                // Quote value if needed
+                if quote_all || value_str.contains(',') || value_str.contains('"') || value_str.contains('\n') {
+                    values.push(format!("\"{}\"", value_str.replace("\"", "\"\"")));
+                } else {
+                    values.push(value_str);
+                }
+            }
+            writeln!(writer, "{}", values.join(","))
+                .map_err(|e| format!("Failed to write row: {}", e))?;
+        }
+    } else if format == "json" {
+        // Write JSON
+        let mut json_rows = Vec::new();
+        for row in &rows {
+            let mut row_map = serde_json::Map::new();
+            for (i, column) in row.columns().iter().enumerate() {
+                let column_name = column.name();
+                let value = if let Ok(v) = row.try_get::<_, Option<bool>>(i) {
+                    v.map(serde_json::Value::Bool).unwrap_or(serde_json::Value::Null)
+                } else if let Ok(v) = row.try_get::<_, Option<i32>>(i) {
+                    v.map(|n| serde_json::Value::Number(n.into())).unwrap_or(serde_json::Value::Null)
+                } else if let Ok(v) = row.try_get::<_, Option<i64>>(i) {
+                    v.map(|n| serde_json::Value::Number(n.into())).unwrap_or(serde_json::Value::Null)
+                } else if let Ok(v) = row.try_get::<_, Option<f64>>(i) {
+                    v.and_then(|n| serde_json::Number::from_f64(n))
+                     .map(serde_json::Value::Number)
+                     .unwrap_or(serde_json::Value::Null)
+                } else if let Ok(v) = row.try_get::<_, Option<String>>(i) {
+                    v.map(serde_json::Value::String).unwrap_or(serde_json::Value::Null)
+                } else {
+                    serde_json::Value::Null
+                };
+                row_map.insert(column_name.to_string(), value);
+            }
+            json_rows.push(serde_json::Value::Object(row_map));
+        }
+        
+        let json_str = serde_json::to_string_pretty(&json_rows)
+            .map_err(|e| format!("Failed to serialize JSON: {}", e))?;
+        writer.write_all(json_str.as_bytes())
+            .map_err(|e| format!("Failed to write JSON: {}", e))?;
+    }
+    
+    writer.flush()
+        .map_err(|e| format!("Failed to flush file: {}", e))?;
+    
+    Ok(format!("Exported {} rows to {}", rows.len(), output_path))
+}
+
+#[tauri::command]
+async fn export_query_native(
+    app: tauri::AppHandle,
+    connection_id: String,
+    sql: String,
+    output_path: String,
+    format: String,
+    include_headers: bool,
+) -> Result<String, String> {
+    println!("Native COPY TO export to: {}", output_path);
+    
+    // Load connection details
+    let store = app.store_builder("connections.json").build()
+        .map_err(|e| format!("Failed to build store: {}", e))?;
+    
+    let connections: Vec<DatabaseConnection> = store.get("connections")
+        .and_then(|value| serde_json::from_value(value).ok())
+        .unwrap_or_default();
+    
+    let connection = connections.iter()
+        .find(|c| c.id == connection_id)
+        .ok_or("Connection not found")?;
+    
+    // Decrypt password if needed
+    let password = match &connection.password {
+        Some(encrypted) if encryption::is_encrypted(encrypted) => {
+            encryption::decrypt_password(encrypted)?
+        },
+        Some(plain) => plain.clone(),
+        None => String::new(),
+    };
+    
+    let ssl_mode = if connection.ssl.unwrap_or(false) { "require" } else { "disable" };
+    
+    let config = format!(
+        "host={} port={} dbname={} user={} password={} sslmode={}",
+        connection.host,
+        connection.port,
+        connection.database,
+        connection.username,
+        password,
+        ssl_mode
+    );
+    
+    // Connect to database
+    let (client, conn) = tokio_postgres::connect(&config, tokio_postgres::NoTls).await
+        .map_err(|e| format!("Connection failed: {}", e))?;
+    
+    tokio::spawn(async move {
+        if let Err(e) = conn.await {
+            eprintln!("Connection error: {}", e);
+        }
+    });
+    
+    // Build COPY TO command
+    let copy_sql = if include_headers {
+        format!("COPY ({}) TO STDOUT WITH (FORMAT CSV, HEADER)", sql)
+    } else {
+        format!("COPY ({}) TO STDOUT WITH (FORMAT CSV)", sql)
+    };
+    
+    // Execute COPY TO and write to file
+    let copy_reader = client.copy_out(&copy_sql).await
+        .map_err(|e| format!("COPY TO failed: {}", e))?;
+    
+    let file = File::create(&output_path)
+        .map_err(|e| format!("Failed to create file: {}", e))?;
+    let mut writer = BufWriter::new(file);
+    
+    // Read all data from COPY
+    use futures::pin_mut;
+    use tokio_postgres::CopyOutStream;
+    use futures::StreamExt;
+    
+    pin_mut!(copy_reader);
+    let mut total_bytes = 0;
+    
+    while let Some(chunk_result) = copy_reader.next().await {
+        let chunk = chunk_result
+            .map_err(|e| format!("Failed to read COPY data: {}", e))?;
+        writer.write_all(&chunk)
+            .map_err(|e| format!("Failed to write to file: {}", e))?;
+        total_bytes += chunk.len();
+    }
+    
+    writer.flush()
+        .map_err(|e| format!("Failed to flush file: {}", e))?;
+    
+    Ok(format!("Exported {} bytes to {}", total_bytes, output_path))
 }
 
 #[tauri::command]
@@ -960,6 +1223,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_sql::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // Initialize encryption
             encryption::initialize_encryption(&app.handle())?;
@@ -1025,7 +1289,9 @@ pub fn run() {
             get_database_schema,
             get_table_columns,
             save_window_state,
-            restore_window_state
+            restore_window_state,
+            export_query_stream,
+            export_query_native
         ])
         .on_menu_event(|app, event| {
             match event.id().as_ref() {

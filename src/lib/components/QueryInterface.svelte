@@ -3,9 +3,10 @@
 	import SqlEditor from '$lib/components/SqlEditor.svelte';
 	import QueryDataGrid from '$lib/components/QueryDataGrid.svelte';
 	import SchemaPanel from '$lib/components/SchemaPanel.svelte';
+	import ExportDialog from '$lib/components/ExportDialog.svelte';
 	import { invoke } from '@tauri-apps/api/core';
 	import type { DatabaseConnection } from '$lib/types/database';
-	import { X, Plus } from 'lucide-svelte';
+	import { X, Plus, FileDown } from 'lucide-svelte';
 	import { Tabs } from '@skeletonlabs/skeleton-svelte';
 	
 	let { 
@@ -21,6 +22,7 @@
 		title: string;
 		sql: string;
 		results: any[];
+		metadata?: any;
 		error: string | null;
 		executionTime: number | null;
 		isExecuting: boolean;
@@ -33,6 +35,8 @@
 	let tabs: QueryTab[] = $state([]);
 	let activeTabId: string = $state('');
 	let databaseSchema: any = $state(null);
+	let schemaPanel: SchemaPanel;
+	let showExportDialog = $state(false);
 	
 	// Initialize tabs from storage or create default
 	function initializeTabs() {
@@ -75,18 +79,62 @@
 	// Initialize tabs immediately
 	initializeTabs();
 	
-	// Load database schema when connection changes
-	$effect(async () => {
+	// Function to refresh database schema
+	async function refreshDatabaseSchema() {
 		if (activeConnection) {
 			try {
 				databaseSchema = await invoke('get_database_schema', {
 					connectionId: activeConnection.id
 				});
-				console.log('Loaded database schema for autocomplete:', databaseSchema);
+				console.log('Refreshed database schema:', databaseSchema);
 			} catch (error) {
-				console.error('Failed to load database schema:', error);
-				databaseSchema = null;
+				console.error('Failed to refresh database schema:', error);
 			}
+		}
+	}
+
+	// Check if a query affects database schema and was successful
+	function isSchemaAffectingQuery(sql: string, results: any[]): boolean {
+		// Only refresh schema if the query was successful (has success status)
+		const isSuccessful = results.length === 1 && results[0].status === 'success';
+		if (!isSuccessful) return false;
+
+		const sqlUpper = sql.trim().toUpperCase();
+		
+		// DDL queries that affect schema structure
+		return sqlUpper.startsWith('CREATE TABLE') ||
+			   sqlUpper.startsWith('CREATE VIEW') ||
+			   sqlUpper.startsWith('CREATE MATERIALIZED VIEW') ||
+			   sqlUpper.startsWith('CREATE INDEX') ||
+			   sqlUpper.startsWith('CREATE UNIQUE INDEX') ||
+			   sqlUpper.startsWith('CREATE FUNCTION') ||
+			   sqlUpper.startsWith('CREATE PROCEDURE') ||
+			   sqlUpper.startsWith('CREATE SEQUENCE') ||
+			   sqlUpper.startsWith('CREATE TYPE') ||
+			   sqlUpper.startsWith('CREATE SCHEMA') ||
+			   sqlUpper.startsWith('DROP TABLE') ||
+			   sqlUpper.startsWith('DROP VIEW') ||
+			   sqlUpper.startsWith('DROP MATERIALIZED VIEW') ||
+			   sqlUpper.startsWith('DROP INDEX') ||
+			   sqlUpper.startsWith('DROP FUNCTION') ||
+			   sqlUpper.startsWith('DROP PROCEDURE') ||
+			   sqlUpper.startsWith('DROP SEQUENCE') ||
+			   sqlUpper.startsWith('DROP TYPE') ||
+			   sqlUpper.startsWith('DROP SCHEMA') ||
+			   sqlUpper.startsWith('ALTER TABLE') ||
+			   sqlUpper.startsWith('ALTER VIEW') ||
+			   sqlUpper.startsWith('ALTER FUNCTION') ||
+			   sqlUpper.startsWith('ALTER SEQUENCE') ||
+			   sqlUpper.startsWith('ALTER TYPE') ||
+			   sqlUpper.startsWith('ALTER SCHEMA') ||
+			   sqlUpper.startsWith('RENAME TABLE') ||
+			   sqlUpper.startsWith('TRUNCATE TABLE'); // TRUNCATE doesn't change structure but might affect row counts
+	}
+
+	// Load database schema when connection changes
+	$effect(async () => {
+		if (activeConnection) {
+			await refreshDatabaseSchema();
 		} else {
 			databaseSchema = null;
 		}
@@ -213,14 +261,34 @@
 		const startTime = performance.now();
 		
 		try {
-			// Execute the SQL query via Tauri backend
-			const result = await invoke<any[]>('execute_query', {
+			// Execute the SQL query via Tauri backend with default limit
+			const response = await invoke<any>('execute_query', {
 				connectionId: activeConnection.id,
-				sql: sql.trim()
+				sql: sql.trim(),
+				limit: 1000 // Default limit
 			});
 			
 			tab.executionTime = Math.round(performance.now() - startTime);
-			tab.results = Array.isArray(result) ? result : [result];
+			
+			// Handle new response structure
+			if (response.results) {
+				tab.results = response.results;
+				tab.metadata = response.metadata; // Store metadata for pagination info
+			} else {
+				// Fallback for old format
+				tab.results = Array.isArray(response) ? response : [response];
+			}
+			
+			// Check if this was a successful DDL query that affects schema
+			const shouldRefreshSchema = isSchemaAffectingQuery(sql.trim(), tab.results);
+			if (shouldRefreshSchema) {
+				console.log('DDL query detected, refreshing schema...');
+				await refreshDatabaseSchema();
+				// Also refresh the SchemaPanel
+				if (schemaPanel && schemaPanel.refreshSchema) {
+					await schemaPanel.refreshSchema();
+				}
+			}
 			
 			// Add to query history
 			addToHistory(sql);
@@ -338,28 +406,13 @@
 	
 	export function exportResults() {
 		if (activeTab && activeTab.results && activeTab.results.length > 0) {
-			const headers = Object.keys(activeTab.results[0]);
-			const rows = activeTab.results.map(row => 
-				headers.map(header => {
-					const value = row[header];
-					if (value === null) return 'NULL';
-					if (typeof value === 'object') return JSON.stringify(value);
-					const strValue = String(value);
-					if (strValue.includes(',') || strValue.includes('"')) {
-						return `"${strValue.replace(/"/g, '""')}"`;
-					}
-					return strValue;
-				}).join(',')
-			);
+			// Skip if this is a DDL/DML success message
+			if (activeTab.results.length === 1 && activeTab.results[0].status === 'success') {
+				return;
+			}
 			
-			const csvContent = [headers.join(','), ...rows].join('\n');
-			const blob = new Blob([csvContent], { type: 'text/csv' });
-			const url = URL.createObjectURL(blob);
-			const a = document.createElement('a');
-			a.href = url;
-			a.download = `query_results_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.csv`;
-			a.click();
-			URL.revokeObjectURL(url);
+			// Show export dialog
+			showExportDialog = true;
 		}
 	}
 	
@@ -403,6 +456,7 @@
 		<div class="flex h-full">
 			<!-- Schema Panel -->
 			<SchemaPanel 
+				bind:this={schemaPanel}
 				activeConnection={activeConnection} 
 				onTableSelect={(name) => insertIntoActiveTab(name)}
 			/>
@@ -467,6 +521,7 @@
 									<div class="flex-1 min-h-0">
 										<QueryDataGrid 
 											data={tab.results}
+											metadata={tab.metadata}
 											error={tab.error}
 											executionTime={tab.executionTime}
 											maxHeight="100%"
@@ -493,3 +548,14 @@
 	}
 </style>
 
+<!-- Export Dialog -->
+{#if activeTab && showExportDialog}
+	<ExportDialog 
+		bind:show={showExportDialog}
+		sql={activeTab.sql}
+		results={activeTab.results}
+		metadata={activeTab.metadata}
+		connectionId={activeConnection?.id || ''}
+		onClose={() => showExportDialog = false}
+	/>
+{/if}
