@@ -50,12 +50,19 @@
 				// Export current view from frontend
 				await exportCurrentView();
 			}
+			
+			// Export completed successfully
+			exportProgress = 'Export complete!';
+			
+			// Close dialog after a brief success message
+			await new Promise(resolve => setTimeout(resolve, 500));
+			show = false;
+			if (onClose) onClose();
 		} catch (error) {
 			console.error('Export failed:', error);
-			alert(`Export failed: ${error}`);
-		} finally {
+			exportProgress = `Export failed: ${error}`;
+			// Keep dialog open on error so user can see the message
 			exporting = false;
-			exportProgress = '';
 		}
 	}
 	
@@ -72,8 +79,7 @@
 		});
 		
 		if (!filePath) {
-			exporting = false;
-			return;
+			throw new Error('Export cancelled by user');
 		}
 		
 		// Call backend to execute COPY TO
@@ -85,11 +91,8 @@
 			includeHeaders
 		});
 		
-		exportProgress = 'Export complete!';
-		setTimeout(() => {
-			show = false;
-			if (onClose) onClose();
-		}, 1000);
+		exportProgress = `Export complete! Saved to ${filePath.split('/').pop()}`;
+		return result;
 	}
 	
 	async function exportStreamFromBackend() {
@@ -104,8 +107,7 @@
 		});
 		
 		if (!filePath) {
-			exporting = false;
-			return;
+			throw new Error('Export cancelled by user');
 		}
 		
 		// Call backend to stream results to file
@@ -120,11 +122,8 @@
 			}
 		});
 		
-		exportProgress = 'Export complete!';
-		setTimeout(() => {
-			show = false;
-			if (onClose) onClose();
-		}, 1000);
+		exportProgress = `Export complete! Saved to ${filePath.split('/').pop()}`;
+		return result;
 	}
 	
 	async function exportCurrentView() {
@@ -136,11 +135,8 @@
 			await exportCurrentAsJSON();
 		}
 		
-		exportProgress = 'Export complete! Check your Downloads folder.';
-		setTimeout(() => {
-			show = false;
-			if (onClose) onClose();
-		}, 1500);
+		exportProgress = 'Export complete! Saved to Downloads folder.';
+		return 'Browser download completed';
 	}
 	
 	async function exportCurrentAsCSV() {
