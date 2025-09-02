@@ -135,7 +135,7 @@
 			await exportCurrentAsJSON();
 		}
 		
-		exportProgress = 'Export complete! Saved to Downloads folder.';
+		exportProgress = 'Export complete! File saved to your Downloads folder.';
 		return 'Browser download completed';
 	}
 	
@@ -248,6 +248,7 @@
 								<div class="flex-1">
 									<span class="text-surface-100 font-medium">Current view</span>
 									<span class="text-surface-400 text-sm ml-2">({currentRows.toLocaleString()} rows)</span>
+									<div class="text-xs text-surface-500 mt-1">→ Downloads folder</div>
 								</div>
 							</label>
 							{#if hasMoreRows}
@@ -264,6 +265,7 @@
 										{#if totalRows > 50000}
 											<span class="ml-2 text-yellow-400 text-xs font-medium bg-yellow-500/10 px-2 py-0.5 rounded">Large dataset</span>
 										{/if}
+										<div class="text-xs text-surface-500 mt-1">→ Choose save location</div>
 									</div>
 								</label>
 							{/if}

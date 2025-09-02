@@ -7,10 +7,13 @@
 	import { invoke } from '@tauri-apps/api/core';
 	import { Modal } from '@skeletonlabs/skeleton-svelte';
 
+	let { onConnectionSuccess = () => {} } = $props();
+
 	let showForm = $state(false);
 	let editingId = $state<string | null>(null);
 	let isLoading = $state(false);
 	let testResults = $state<Record<string, { success: boolean; error?: string }>>({});
+	let connectionResults = $state<Record<string, { success: boolean; error?: string }>>({});
 	let deleteModalOpen = $state(false);
 	let connectionToDelete = $state<string | null>(null);
 	
@@ -79,6 +82,8 @@
 	}
 
 	async function handleTest(connection: any) {
+		// Clear any previous connection results when testing
+		connectionResults[connection.id] = undefined;
 		testResults[connection.id] = { success: false };
 		
 		try {
@@ -91,14 +96,28 @@
 	}
 
 	async function handleConnect(connection: any) {
+		// Clear any previous test results when attempting to connect
+		testResults[connection.id] = undefined;
+		connectionResults[connection.id] = { success: false };
+		
 		try {
 			await connectToDatabase(connection);
+			connectionResults[connection.id] = { success: true };
+			// Add a small delay and then transition to query editor
+			setTimeout(() => {
+				onConnectionSuccess();
+			}, 100);
 		} catch (error) {
 			console.error('Failed to connect:', error);
+			connectionResults[connection.id] = { success: false, error: String(error) };
 		}
 	}
 
 	function handleEdit(connection: any) {
+		// Clear any previous results when editing
+		testResults[connection.id] = undefined;
+		connectionResults[connection.id] = undefined;
+		
 		formData = {
 			name: connection.name,
 			host: connection.host,
@@ -278,13 +297,20 @@
 								<div class="mt-2 flex items-center gap-2">
 									{#if testResults[connection.id].success}
 										<CheckCircle class="h-4 w-4 text-success-500" />
-										<span class="text-sm text-success-600">Connection successful</span>
+										<span class="text-sm text-success-600">Test successful</span>
 									{:else}
 										<AlertCircle class="h-4 w-4 text-error-500" />
 										<span class="text-sm text-error-600">
-											{testResults[connection.id].error || 'Connection failed'}
+											Test failed: {testResults[connection.id].error || 'Unknown error'}
 										</span>
 									{/if}
+								</div>
+							{:else if connectionResults[connection.id] && !connectionResults[connection.id].success}
+								<div class="mt-2 flex items-center gap-2">
+									<AlertCircle class="h-4 w-4 text-error-500" />
+									<span class="text-sm text-error-600">
+										Connection failed: {connectionResults[connection.id].error || 'Unknown error'}
+									</span>
 								</div>
 							{/if}
 						</div>

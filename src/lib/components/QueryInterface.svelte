@@ -31,11 +31,11 @@
 	
 	let tabCounter = 0;
 	let queryHistory: string[] = $state([]);
-	let editors: Record<string, SqlEditor> = {};
+	let editors: Record<string, SqlEditor> = $state({});
 	let tabs: QueryTab[] = $state([]);
 	let activeTabId: string = $state('');
 	let databaseSchema: any = $state(null);
-	let schemaPanel: SchemaPanel;
+	let schemaPanel = $state<SchemaPanel>();
 	let showExportDialog = $state(false);
 	
 	// Initialize tabs from storage or create default
@@ -452,7 +452,7 @@
 </script>
 
 <div class="flex flex-col h-full">
-	{#if tabs.length > 0}
+	{#if activeConnection && tabs.length > 0}
 		<div class="flex h-full">
 			<!-- Schema Panel -->
 			<SchemaPanel 
@@ -532,6 +532,12 @@
 						{/each}
 					{/snippet}
 				</Tabs>
+			</div>
+		</div>
+	{:else if !activeConnection}
+		<div class="flex items-center justify-center h-full text-surface-500">
+			<div class="text-center">
+				<p class="text-lg">Connecting to database...</p>
 			</div>
 		</div>
 	{/if}

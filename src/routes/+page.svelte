@@ -3,6 +3,7 @@
   import { listen } from "@tauri-apps/api/event";
   import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
   import { onMount } from "svelte";
+  import { fade, slide } from 'svelte/transition';
   import { Database, Settings, FileText, Menu, History, Table, Clock, Bookmark } from "lucide-svelte";
   import { Navigation } from '@skeletonlabs/skeleton-svelte';
   import ConnectionManager from "$lib/components/ConnectionManager.svelte";
@@ -244,25 +245,29 @@
     </header>
 
     <!-- Main content -->
-    <main class="card flex-1 overflow-auto min-h-0">
-    {#if currentView === "connections"}
-      <ConnectionManager />
-    {:else if currentView === "query"}
-      <QueryInterface 
-        bind:this={queryInterface} 
-        activeConnection={$activeConnection} 
-        onResultsChange={(results, error, time, executing) => {
-          queryResults = results;
-          queryError = error;
-          executionTime = time;
-          isExecuting = executing;
-        }}
-      />
-    {:else if currentView === "history"}
-      <QueryHistory activeConnection={$activeConnection} onRunQuery={handleRunQueryFromHistory} onEditQuery={handleEditQueryFromHistory} />
-    {:else if currentView === "saved"}
-      <SavedQueries activeConnection={$activeConnection} onRunQuery={handleRunQueryFromHistory} onEditQuery={handleEditQueryFromHistory} />
-    {/if}
+    <main class="card flex-1 overflow-auto min-h-0 relative">
+    {#key currentView}
+      <div transition:fade={{ duration: 300 }} class="absolute inset-0 overflow-auto">
+        {#if currentView === "connections"}
+          <ConnectionManager onConnectionSuccess={() => currentView = "query"} />
+        {:else if currentView === "query"}
+          <QueryInterface 
+            bind:this={queryInterface} 
+            activeConnection={$activeConnection} 
+            onResultsChange={(results, error, time, executing) => {
+              queryResults = results;
+              queryError = error;
+              executionTime = time;
+              isExecuting = executing;
+            }}
+          />
+        {:else if currentView === "history"}
+          <QueryHistory activeConnection={$activeConnection} onRunQuery={handleRunQueryFromHistory} onEditQuery={handleEditQueryFromHistory} />
+        {:else if currentView === "saved"}
+          <SavedQueries activeConnection={$activeConnection} onRunQuery={handleRunQueryFromHistory} onEditQuery={handleEditQueryFromHistory} />
+        {/if}
+      </div>
+    {/key}
     </main>
     
     <!-- Status bar - only show when connected -->
