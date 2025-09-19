@@ -109,6 +109,13 @@
 	let tableColumns = $state<Record<string, SchemaColumn[]>>({});
 	let loadingColumns = $state<Set<string>>(new Set());
 	
+	// Section collapse states - all expanded by default
+	let expandedSections = $state<Set<string>>(new Set([
+		'tables', 'views', 'materialized_views', 'indexes', 
+		'functions', 'triggers', 'sequences', 'foreign_keys', 
+		'constraints', 'enums', 'schemas'
+	]));
+	
 	onMount(() => {
 		if (activeConnection) {
 			loadSchema();
@@ -190,6 +197,15 @@
 		}
 	}
 	
+	function toggleSection(section: string) {
+		if (expandedSections.has(section)) {
+			expandedSections.delete(section);
+		} else {
+			expandedSections.add(section);
+		}
+		expandedSections = new Set(expandedSections);
+	}
+	
 	function getColumnIcon(dataType: string) {
 		const type = dataType.toLowerCase();
 		if (type.includes('int') || type.includes('serial') || type.includes('numeric') || type.includes('decimal')) {
@@ -233,11 +249,20 @@
 			<!-- Tables Section -->
 			{#if schema.tables.length > 0}
 				<div class="mb-4">
-					<div class="flex items-center gap-2 px-2 py-1 text-xs font-medium text-surface-400 uppercase tracking-wide">
+					<button
+						onclick={() => toggleSection('tables')}
+						class="w-full flex items-center gap-2 px-2 py-1 text-xs font-medium text-surface-400 uppercase tracking-wide hover:bg-surface-200-700 rounded transition-colors"
+					>
+						{#if expandedSections.has('tables')}
+							<ChevronDown class="h-3 w-3" />
+						{:else}
+							<ChevronRight class="h-3 w-3" />
+						{/if}
 						<Table class="h-3 w-3" />
 						<span>Tables ({schema.tables.length})</span>
-					</div>
-					{#each schema.tables as table (table.table_name)}
+					</button>
+					{#if expandedSections.has('tables')}
+						{#each schema.tables as table (table.table_name)}
 						<div class="ml-1">
 							<div class="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-surface-300 hover:bg-surface-200-700 rounded transition-colors group">
 								<button
@@ -301,17 +326,27 @@
 							{/if}
 						</div>
 					{/each}
+					{/if}
 				</div>
 			{/if}
 			
 			<!-- Views Section -->
 			{#if schema.views.length > 0}
 				<div class="mb-4">
-					<div class="flex items-center gap-2 px-2 py-1 text-xs font-medium text-surface-400 uppercase tracking-wide">
+					<button
+						onclick={() => toggleSection('views')}
+						class="w-full flex items-center gap-2 px-2 py-1 text-xs font-medium text-surface-400 uppercase tracking-wide hover:bg-surface-200-700 rounded transition-colors"
+					>
+						{#if expandedSections.has('views')}
+							<ChevronDown class="h-3 w-3" />
+						{:else}
+							<ChevronRight class="h-3 w-3" />
+						{/if}
 						<Eye class="h-3 w-3" />
 						<span>Views ({schema.views.length})</span>
-					</div>
-					{#each schema.views as view (view.table_name)}
+					</button>
+					{#if expandedSections.has('views')}
+						{#each schema.views as view (view.table_name)}
 						<div class="ml-1">
 							<div class="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-surface-300 hover:bg-surface-200-700 rounded transition-colors group">
 								<button
@@ -375,16 +410,23 @@
 							{/if}
 						</div>
 					{/each}
+					{/if}
 				</div>
 			{/if}
 
 			<!-- Materialized Views Section -->
 			{#if schema.materialized_views.length > 0}
 				<div class="mb-4">
-					<div class="flex items-center gap-2 px-2 py-1 text-xs font-medium text-surface-400 uppercase tracking-wide">
+					<button onclick={() => toggleSection('materializedViews')} class="w-full flex items-center gap-2 px-2 py-1 text-xs font-medium text-surface-400 uppercase tracking-wide hover:text-surface-300 hover:bg-surface-200-700 rounded transition-colors">
+						{#if expandedSections.has('materializedViews')}
+							<ChevronDown class="h-3 w-3" />
+						{:else}
+							<ChevronRight class="h-3 w-3" />
+						{/if}
 						<Layers class="h-3 w-3" />
 						<span>Materialized Views ({schema.materialized_views.length})</span>
-					</div>
+					</button>
+					{#if expandedSections.has('materializedViews')}
 					{#each schema.materialized_views as view (view.table_name)}
 						<div class="ml-1">
 							<div class="flex items-center gap-2 px-2 py-1.5 text-sm text-surface-300 hover:bg-surface-200-700 rounded transition-colors group">
@@ -405,16 +447,23 @@
 							</div>
 						</div>
 					{/each}
+					{/if}
 				</div>
 			{/if}
 
 			<!-- Indexes Section -->
 			{#if schema.indexes.length > 0}
 				<div class="mb-4">
-					<div class="flex items-center gap-2 px-2 py-1 text-xs font-medium text-surface-400 uppercase tracking-wide">
+					<button onclick={() => toggleSection('indexes')} class="w-full flex items-center gap-2 px-2 py-1 text-xs font-medium text-surface-400 uppercase tracking-wide hover:text-surface-300 hover:bg-surface-200-700 rounded transition-colors">
+						{#if expandedSections.has('indexes')}
+							<ChevronDown class="h-3 w-3" />
+						{:else}
+							<ChevronRight class="h-3 w-3" />
+						{/if}
 						<Zap class="h-3 w-3" />
 						<span>Indexes ({schema.indexes.length})</span>
-					</div>
+					</button>
+					{#if expandedSections.has('indexes')}
 					{#each schema.indexes as index (index.index_name)}
 						<div class="ml-1">
 							<div class="flex items-center gap-2 px-2 py-1.5 text-sm text-surface-300 hover:bg-surface-200-700 rounded transition-colors group">
@@ -435,16 +484,23 @@
 							</div>
 						</div>
 					{/each}
+					{/if}
 				</div>
 			{/if}
 
 			<!-- Functions Section -->
 			{#if schema.functions.length > 0}
 				<div class="mb-4">
-					<div class="flex items-center gap-2 px-2 py-1 text-xs font-medium text-surface-400 uppercase tracking-wide">
+					<button onclick={() => toggleSection('functions')} class="w-full flex items-center gap-2 px-2 py-1 text-xs font-medium text-surface-400 uppercase tracking-wide hover:text-surface-300 hover:bg-surface-200-700 rounded transition-colors">
+						{#if expandedSections.has('functions')}
+							<ChevronDown class="h-3 w-3" />
+						{:else}
+							<ChevronRight class="h-3 w-3" />
+						{/if}
 						<Settings class="h-3 w-3" />
 						<span>Functions ({schema.functions.length})</span>
-					</div>
+					</button>
+					{#if expandedSections.has('functions')}
 					{#each schema.functions as func (func.function_name)}
 						<div class="ml-1">
 							<div class="flex items-center gap-2 px-2 py-1.5 text-sm text-surface-300 hover:bg-surface-200-700 rounded transition-colors group">
@@ -465,16 +521,23 @@
 							</div>
 						</div>
 					{/each}
+					{/if}
 				</div>
 			{/if}
 
 			<!-- Sequences Section -->
 			{#if schema.sequences.length > 0}
 				<div class="mb-4">
-					<div class="flex items-center gap-2 px-2 py-1 text-xs font-medium text-surface-400 uppercase tracking-wide">
+					<button onclick={() => toggleSection('sequences')} class="w-full flex items-center gap-2 px-2 py-1 text-xs font-medium text-surface-400 uppercase tracking-wide hover:text-surface-300 hover:bg-surface-200-700 rounded transition-colors">
+						{#if expandedSections.has('sequences')}
+							<ChevronDown class="h-3 w-3" />
+						{:else}
+							<ChevronRight class="h-3 w-3" />
+						{/if}
 						<Hash class="h-3 w-3" />
 						<span>Sequences ({schema.sequences.length})</span>
-					</div>
+					</button>
+					{#if expandedSections.has('sequences')}
 					{#each schema.sequences as seq (seq.sequence_name)}
 						<div class="ml-1">
 							<div class="flex items-center gap-2 px-2 py-1.5 text-sm text-surface-300 hover:bg-surface-200-700 rounded transition-colors group">
@@ -495,16 +558,23 @@
 							</div>
 						</div>
 					{/each}
+					{/if}
 				</div>
 			{/if}
 
 			<!-- Foreign Keys Section -->
 			{#if schema.foreign_keys.length > 0}
 				<div class="mb-4">
-					<div class="flex items-center gap-2 px-2 py-1 text-xs font-medium text-surface-400 uppercase tracking-wide">
+					<button onclick={() => toggleSection('foreign_keys')} class="w-full flex items-center gap-2 px-2 py-1 text-xs font-medium text-surface-400 uppercase tracking-wide hover:text-surface-300 hover:bg-surface-200-700 rounded transition-colors">
+						{#if expandedSections.has('foreign_keys')}
+							<ChevronDown class="h-3 w-3" />
+						{:else}
+							<ChevronRight class="h-3 w-3" />
+						{/if}
 						<Link class="h-3 w-3" />
 						<span>Foreign Keys ({schema.foreign_keys.length})</span>
-					</div>
+					</button>
+					{#if expandedSections.has('foreign_keys')}
 					{#each schema.foreign_keys as fk (fk.constraint_name)}
 						<div class="ml-1">
 							<div class="flex items-center gap-2 px-2 py-1.5 text-sm text-surface-300 hover:bg-surface-200-700 rounded transition-colors group">
@@ -524,16 +594,23 @@
 							</div>
 						</div>
 					{/each}
+					{/if}
 				</div>
 			{/if}
 
 			<!-- Enums Section -->
 			{#if schema.enums.length > 0}
 				<div class="mb-4">
-					<div class="flex items-center gap-2 px-2 py-1 text-xs font-medium text-surface-400 uppercase tracking-wide">
+					<button onclick={() => toggleSection('enums')} class="w-full flex items-center gap-2 px-2 py-1 text-xs font-medium text-surface-400 uppercase tracking-wide hover:text-surface-300 hover:bg-surface-200-700 rounded transition-colors">
+						{#if expandedSections.has('enums')}
+							<ChevronDown class="h-3 w-3" />
+						{:else}
+							<ChevronRight class="h-3 w-3" />
+						{/if}
 						<Package class="h-3 w-3" />
 						<span>Enums ({schema.enums.length})</span>
-					</div>
+					</button>
+					{#if expandedSections.has('enums')}
 					{#each schema.enums as enumType (enumType.type_name)}
 						<div class="ml-1">
 							<div class="flex items-center gap-2 px-2 py-1.5 text-sm text-surface-300 hover:bg-surface-200-700 rounded transition-colors group">
@@ -554,16 +631,23 @@
 							</div>
 						</div>
 					{/each}
+					{/if}
 				</div>
 			{/if}
 
 			<!-- Schemas Section -->
 			{#if schema.schemas.length > 1}
 				<div class="mb-4">
-					<div class="flex items-center gap-2 px-2 py-1 text-xs font-medium text-surface-400 uppercase tracking-wide">
+					<button onclick={() => toggleSection('schemas')} class="w-full flex items-center gap-2 px-2 py-1 text-xs font-medium text-surface-400 uppercase tracking-wide hover:text-surface-300 hover:bg-surface-200-700 rounded transition-colors">
+						{#if expandedSections.has('schemas')}
+							<ChevronDown class="h-3 w-3" />
+						{:else}
+							<ChevronRight class="h-3 w-3" />
+						{/if}
 						<Folder class="h-3 w-3" />
 						<span>Schemas ({schema.schemas.length})</span>
-					</div>
+					</button>
+					{#if expandedSections.has('schemas')}
 					{#each schema.schemas as schemaItem (schemaItem.schema_name)}
 						<div class="ml-1">
 							<div class="flex items-center gap-2 px-2 py-1.5 text-sm text-surface-300 hover:bg-surface-200-700 rounded transition-colors group">
@@ -584,6 +668,7 @@
 							</div>
 						</div>
 					{/each}
+					{/if}
 				</div>
 			{/if}
 			

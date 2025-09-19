@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Database, Plus, Trash2, TestTube, Loader2, AlertCircle, CheckCircle, Edit } from 'lucide-svelte';
+	import { Database, Plus, Trash2, TestTube, Loader2, AlertCircle, CheckCircle, Edit, PlusCircle } from 'lucide-svelte';
 	import { connections, loadConnections, saveConnection, updateConnection, deleteConnection, testConnection, connectToDatabase } from '$lib/stores/connections';
 	import type { CreateConnectionRequest, UpdateConnectionRequest, TestConnectionRequest, TestConnectionResponse } from '$lib/types/database';
 	import { CONNECTION_COLORS, getRandomConnectionColor } from '$lib/utils/colors';
 	import { invoke } from '@tauri-apps/api/core';
 	import { Modal } from '@skeletonlabs/skeleton-svelte';
+	import CreateDatabaseDialog from './CreateDatabaseDialog.svelte';
 
 	let { onConnectionSuccess = () => {} } = $props();
 
@@ -16,6 +17,7 @@
 	let connectionResults = $state<Record<string, { success: boolean; error?: string }>>({});
 	let deleteModalOpen = $state(false);
 	let connectionToDelete = $state<string | null>(null);
+	let showCreateDatabaseDialog = $state(false);
 	
 	let formData = $state<CreateConnectionRequest>({
 		name: '',
@@ -150,11 +152,32 @@
 		if (!date) return 'Never';
 		return new Date(date).toLocaleDateString();
 	}
+
+	function handleDatabaseCreated(dbName: string) {
+		// After database is created, pre-fill the form with the new database
+		formData.database = dbName;
+		showCreateDatabaseDialog = false;
+
+		// If form isn't visible, show it so user can complete the connection
+		if (!showForm) {
+			showForm = true;
+		}
+	}
 </script>
 
 <div class="p-6 pt-2 max-w-6xl mx-auto">
-	<div class="flex items-center justify-end mb-4">
-		<button class="btn btn-ghost-surface px-6 py-2 bg-surface-200-700 hover:bg-surface-300-600 border border-surface-300-600 rounded-lg transition-colors" onclick={() => showForm = !showForm}>
+	<div class="flex items-center justify-end mb-4 gap-3">
+		<button
+			class="btn btn-ghost-surface px-6 py-2 bg-surface-200-700 hover:bg-surface-300-600 border border-surface-300-600 rounded-lg transition-colors"
+			onclick={() => showCreateDatabaseDialog = true}
+		>
+			<PlusCircle class="h-4 w-4 mr-2" />
+			Create Database
+		</button>
+		<button
+			class="btn btn-ghost-surface px-6 py-2 bg-surface-200-700 hover:bg-surface-300-600 border border-surface-300-600 rounded-lg transition-colors"
+			onclick={() => showForm = !showForm}
+		>
 			<Plus class="h-4 w-4 mr-2" />
 			Add Connection
 		</button>
@@ -380,4 +403,11 @@
 			</div>
 		{/snippet}
 	</Modal>
+
+	<!-- Create Database Dialog -->
+	<CreateDatabaseDialog
+		bind:show={showCreateDatabaseDialog}
+		onSuccess={handleDatabaseCreated}
+		onError={(error) => console.error('Database creation error:', error)}
+	/>
 </div>

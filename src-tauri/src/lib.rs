@@ -218,6 +218,128 @@ async fn test_database_connection(connection: TestConnectionRequest) -> Result<T
     }
 }
 
+#[derive(Debug, Deserialize)]
+struct CreateDatabaseRequest {
+    // Connection details for the PostgreSQL server
+    host: String,
+    port: u16,
+    username: String,
+    password: String,
+    ssl: Option<bool>,
+    // New database details
+    new_database_name: String,
+    encoding: Option<String>,
+    template: Option<String>,
+    owner: Option<String>,
+}
+
+#[tauri::command]
+async fn create_database(request: CreateDatabaseRequest) -> Result<String, String> {
+    println!("Creating database: {}", request.new_database_name);
+
+    // Validate database name - basic SQL injection prevention
+    if !request.new_database_name.chars().all(|c| c.is_alphanumeric() || c == '_') {
+        return Err("Database name can only contain alphanumeric characters and underscores".to_string());
+    }
+
+    let ssl_mode = if request.ssl.unwrap_or(false) { "require" } else { "disable" };
+
+    // Connect to postgres database to create the new database
+    let config = format!(
+        "host={} port={} dbname=postgres user={} password={} sslmode={}",
+        request.host,
+        request.port,
+        request.username,
+        request.password,
+        ssl_mode
+    );
+
+    let (client, conn) = tokio_postgres::connect(&config, tokio_postgres::NoTls).await
+        .map_err(|e| format!("Failed to connect to PostgreSQL server: {}", e))?;
+
+    tokio::spawn(async move {
+        if let Err(e) = conn.await {
+            eprintln!("Connection error: {}", e);
+        }
+    });
+
+    // Build CREATE DATABASE command with options
+    let mut create_db_sql = format!("CREATE DATABASE \"{}\"", request.new_database_name);
+    let mut options = Vec::new();
+
+    if let Some(encoding) = request.encoding {
+        options.push(format!("ENCODING = '{}'", encoding));
+    }
+
+    if let Some(template) = request.template {
+        options.push(format!("TEMPLATE = {}", template));
+    }
+
+    if let Some(owner) = request.owner {
+        options.push(format!("OWNER = {}", owner));
+    }
+
+    if !options.is_empty() {
+        create_db_sql.push_str(&format!(" WITH {}", options.join(" ")));
+    }
+
+    // Execute CREATE DATABASE
+    client.execute(&create_db_sql, &[]).await
+        .map_err(|e| {
+            // Provide user-friendly error messages
+            let error_msg = e.to_string();
+            if error_msg.contains("already exists") {
+                format!("Database '{}' already exists", request.new_database_name)
+            } else if error_msg.contains("permission denied") {
+                format!("Permission denied: User '{}' does not have permission to create databases", request.username)
+            } else {
+                format!("Failed to create database: {}", e)
+            }
+        })?;
+
+    Ok(format!("Database '{}' created successfully", request.new_database_name))
+}
+
+#[tauri::command]
+async fn list_databases(
+    host: String,
+    port: u16,
+    username: String,
+    password: String,
+    ssl: Option<bool>
+) -> Result<Vec<String>, String> {
+    let ssl_mode = if ssl.unwrap_or(false) { "require" } else { "disable" };
+
+    let config = format!(
+        "host={} port={} dbname=postgres user={} password={} sslmode={}",
+        host, port, username, password, ssl_mode
+    );
+
+    let (client, conn) = tokio_postgres::connect(&config, tokio_postgres::NoTls).await
+        .map_err(|e| format!("Failed to connect: {}", e))?;
+
+    tokio::spawn(async move {
+        if let Err(e) = conn.await {
+            eprintln!("Connection error: {}", e);
+        }
+    });
+
+    // Query for all databases the user can connect to
+    let query = "SELECT datname FROM pg_database
+                 WHERE datistemplate = false
+                 AND has_database_privilege(datname, 'CONNECT')
+                 ORDER BY datname";
+
+    let rows = client.query(query, &[]).await
+        .map_err(|e| format!("Failed to list databases: {}", e))?;
+
+    let databases: Vec<String> = rows.iter()
+        .map(|row| row.get::<_, String>(0))
+        .collect();
+
+    Ok(databases)
+}
+
 #[tauri::command]
 async fn test_stored_connection(connection: DatabaseConnection) -> Result<TestConnectionResponse, String> {
     println!("Testing stored connection: {}", connection.name);
@@ -1273,8 +1395,8 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            greet, 
-            open_log_folder, 
+            greet,
+            open_log_folder,
             get_log_path,
             get_stored_connections,
             save_connection,
@@ -1282,6 +1404,8 @@ pub fn run() {
             delete_connection,
             test_database_connection,
             test_stored_connection,
+            create_database,
+            list_databases,
             execute_query,
             connect_to_database,
             disconnect_from_database,

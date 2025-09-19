@@ -130,7 +130,7 @@
 	}
 </script>
 
-<div class="query-data-grid h-full flex flex-col bg-background">
+<div class="query-data-grid h-full flex flex-col bg-surface-800 rounded-lg overflow-hidden">
 	{#if error}
 		<div class="p-6 bg-red-900/20 text-red-400 border-b border-red-800 rounded-t-lg">
 			<div class="flex items-center gap-3">
@@ -210,64 +210,115 @@
 		position: relative;
 	}
 	
-	/* Beekeeper Studio inspired SVAR Grid styling */
+	/* Modern data grid styling matching app theme */
 	:global(.wx-grid) {
-		--wx-grid-background: rgb(15 23 42);
-		--wx-grid-text-color: rgb(203 213 225);
-		--wx-grid-header-background: rgb(30 41 59);
-		--wx-grid-header-text-color: rgb(148 163 184);
-		--wx-grid-row-hover: rgb(51 65 85);
-		--wx-grid-row-selected: rgb(59 130 246 / 0.3);
-		--wx-grid-border-color: rgb(71 85 105);
-		font-size: 0.8rem;
+		--wx-grid-background: #1e293b;
+		--wx-grid-text-color: #cbd5e1;
+		--wx-grid-header-background: #334155;
+		--wx-grid-header-text-color: #94a3b8;
+		--wx-grid-row-hover: #475569;
+		--wx-grid-row-selected: rgba(59, 130, 246, 0.2);
+		--wx-grid-border-color: #475569;
+		font-size: 0.875rem;
 		font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
-		background: rgb(15 23 42);
-		border: 1px solid rgb(71 85 105);
+		background: #1e293b;
+		border: 1px solid #475569;
+		border-radius: 0.5rem;
+		overflow: hidden;
 	}
 	
 	:global(.wx-grid .wx-cell) {
 		padding: 0.75rem 1rem;
-		border-color: rgb(71 85 105);
-		color: rgb(203 213 225);
+		border-color: #475569;
+		color: #cbd5e1;
+		line-height: 1.5;
 	}
 	
 	:global(.wx-grid .wx-header-cell) {
 		font-weight: 600;
-		background: rgb(30 41 59);
-		color: rgb(148 163 184);
-		border-color: rgb(71 85 105);
+		background: #334155;
+		color: #94a3b8;
+		border-color: #475569;
 		text-transform: uppercase;
-		font-size: 0.7rem;
+		font-size: 0.75rem;
 		letter-spacing: 0.05em;
-		padding: 0.75rem 1rem;
+		padding: 0.875rem 1rem;
+		font-family: inherit;
 	}
 	
 	:global(.wx-grid .wx-row:hover) {
-		background: rgb(51 65 85);
+		background: #475569;
+		transition: background-color 0.15s ease-in-out;
 	}
 	
 	:global(.wx-grid .wx-row:nth-child(even)) {
-		background: rgb(15 23 42);
+		background: #1e293b;
 	}
 	
 	:global(.wx-grid .wx-row:nth-child(odd)) {
-		background: rgb(15 23 42);
+		background: #1e293b;
+	}
+	
+	:global(.wx-grid .wx-row.selected) {
+		background: rgba(59, 130, 246, 0.2);
+		border-left: 3px solid #3b82f6;
 	}
 	
 	:global(.wx-grid .wx-pager) {
-		background: rgb(30 41 59);
-		border-top: 1px solid rgb(71 85 105);
-		color: rgb(148 163 184);
+		background: #334155;
+		border-top: 1px solid #475569;
+		color: #94a3b8;
+		padding: 0.75rem 1rem;
 	}
 	
 	:global(.wx-grid .wx-pager .wx-pager-button) {
-		color: rgb(148 163 184);
-		background: transparent;
-		border: 1px solid rgb(71 85 105);
+		color: #94a3b8;
+		background: #1e293b;
+		border: 1px solid #475569;
+		border-radius: 0.375rem;
+		padding: 0.5rem 0.75rem;
+		font-size: 0.875rem;
+		transition: all 0.15s ease-in-out;
 	}
 	
 	:global(.wx-grid .wx-pager .wx-pager-button:hover) {
-		background: rgb(51 65 85);
-		color: rgb(203 213 225);
+		background: #475569;
+		color: #cbd5e1;
+		border-color: #64748b;
+	}
+	
+	:global(.wx-grid .wx-pager .wx-pager-button:disabled) {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+	
+	:global(.wx-grid .wx-pager .wx-pager-button.active) {
+		background: #3b82f6;
+		color: white;
+		border-color: #3b82f6;
+	}
+	
+	/* Special styling for different data types */
+	:global(.wx-grid .wx-cell) {
+		font-variant-numeric: tabular-nums;
+	}
+	
+	/* Add subtle shadows for better depth */
+	:global(.wx-grid) {
+		box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+	}
+	
+	/* Improve filter and sort indicators */
+	:global(.wx-grid .wx-header-cell .wx-sort-indicator) {
+		color: #3b82f6;
+	}
+	
+	/* Improve column resizer */
+	:global(.wx-grid .wx-column-resizer) {
+		background: #64748b;
+	}
+	
+	:global(.wx-grid .wx-column-resizer:hover) {
+		background: #3b82f6;
 	}
 </style>
