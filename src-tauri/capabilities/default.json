@@ -6,10 +6,12 @@
   "permissions": [
     "core:default",
     "opener:default",
-    "updater:default", 
+    "updater:default",
     "process:default",
     "log:default",
     "shell:default",
-    "clipboard-manager:default"
+    "clipboard-manager:default",
+    "clipboard-manager:allow-write-text",
+    "clipboard-manager:allow-read-text"
   ]
 }

@@ -1206,6 +1206,269 @@ async fn get_table_columns(app: tauri::AppHandle, connection_id: String, table_n
 }
 
 #[tauri::command]
+async fn get_table_create_statement(app: tauri::AppHandle, connection_id: String, table_name: String, schema_name: Option<String>) -> Result<String, String> {
+    // Load connections from store to get the connection details
+    let store = app.store_builder("connections.json").build()
+        .map_err(|e| format!("Failed to build store: {}", e))?;
+
+    let connections: Vec<DatabaseConnection> = store.get("connections")
+        .and_then(|value| serde_json::from_value(value).ok())
+        .unwrap_or_default();
+
+    let connection = connections.iter()
+        .find(|c| c.id == connection_id)
+        .ok_or("Connection not found")?;
+
+    // Decrypt password if it's encrypted
+    let password = match &connection.password {
+        Some(encrypted) if encryption::is_encrypted(encrypted) => {
+            encryption::decrypt_password(encrypted)?
+        },
+        Some(plain) => plain.clone(),
+        None => String::new(),
+    };
+
+    let ssl_mode = if connection.ssl.unwrap_or(false) { "require" } else { "disable" };
+
+    let config = format!(
+        "host={} port={} dbname={} user={} password={} sslmode={}",
+        connection.host,
+        connection.port,
+        connection.database,
+        connection.username,
+        password,
+        ssl_mode
+    );
+
+    let (client, conn) = tokio_postgres::connect(&config, tokio_postgres::NoTls).await
+        .map_err(|e| format!("Connection failed: {}", e))?;
+
+    // Spawn connection handler
+    tokio::spawn(async move {
+        if let Err(e) = conn.await {
+            eprintln!("Connection error: {}", e);
+        }
+    });
+
+    let schema_prefix = schema_name.as_ref().map(|s| format!("{}.", s)).unwrap_or_else(|| "public.".to_string());
+
+    // Query for table columns
+    let column_query = "
+        SELECT
+            c.column_name,
+            c.udt_name,
+            c.character_maximum_length,
+            c.numeric_precision,
+            c.numeric_scale,
+            c.datetime_precision,
+            c.is_nullable,
+            c.column_default,
+            c.data_type
+        FROM information_schema.columns c
+        WHERE c.table_schema = COALESCE($2, 'public')
+            AND c.table_name = $1
+        ORDER BY c.ordinal_position
+    ";
+
+    let rows = client.query(column_query, &[&table_name, &schema_name.as_ref().unwrap_or(&"public".to_string())]).await
+        .map_err(|e| format!("Column query failed: {}", e))?;
+
+    if rows.is_empty() {
+        return Err(format!("Table '{}' not found", table_name));
+    }
+
+    let mut column_definitions = Vec::new();
+
+    for row in rows {
+        let column_name: String = row.get(0);
+        let udt_name: String = row.get(1);
+        let char_max_length: Option<i32> = row.get(2);
+        let numeric_precision: Option<i32> = row.get(3);
+        let numeric_scale: Option<i32> = row.get(4);
+        let datetime_precision: Option<i32> = row.get(5);
+        let is_nullable: String = row.get(6);
+        let column_default: Option<String> = row.get(7);
+        let data_type: String = row.get(8);
+
+        // Build the data type string
+        let mut type_string = match data_type.as_str() {
+            "character varying" => {
+                if let Some(len) = char_max_length {
+                    format!("character varying({})", len)
+                } else {
+                    "character varying".to_string()
+                }
+            },
+            "character" => {
+                if let Some(len) = char_max_length {
+                    format!("character({})", len)
+                } else {
+                    "character".to_string()
+                }
+            },
+            "numeric" => {
+                if let (Some(precision), Some(scale)) = (numeric_precision, numeric_scale) {
+                    if scale > 0 {
+                        format!("numeric({},{})", precision, scale)
+                    } else {
+                        format!("numeric({})", precision)
+                    }
+                } else {
+                    "numeric".to_string()
+                }
+            },
+            "timestamp without time zone" => {
+                if let Some(precision) = datetime_precision {
+                    if precision != 6 {
+                        format!("timestamp({}) without time zone", precision)
+                    } else {
+                        "timestamp without time zone".to_string()
+                    }
+                } else {
+                    "timestamp without time zone".to_string()
+                }
+            },
+            "timestamp with time zone" => {
+                if let Some(precision) = datetime_precision {
+                    if precision != 6 {
+                        format!("timestamp({}) with time zone", precision)
+                    } else {
+                        "timestamp with time zone".to_string()
+                    }
+                } else {
+                    "timestamp with time zone".to_string()
+                }
+            },
+            _ => data_type.clone()
+        };
+
+        // Quote column name if it contains special characters or is mixed case
+        let quoted_column = if column_name.chars().any(|c| c.is_uppercase()) || column_name.contains(' ') {
+            format!("\"{}\"", column_name)
+        } else {
+            column_name.clone()
+        };
+
+        let mut col_def = format!("  {} {}", quoted_column, type_string);
+
+        // Add NOT NULL constraint
+        if is_nullable == "NO" {
+            col_def.push_str(" not null");
+        } else {
+            col_def.push_str(" null");
+        }
+
+        // Add default value if present
+        if let Some(default) = column_default {
+            // Clean up the default value (remove type casts for readability where appropriate)
+            let cleaned_default = if default.starts_with("nextval(") {
+                // Keep sequence defaults as-is
+                default
+            } else if default.ends_with("::character varying") {
+                default.replace("::character varying", "")
+            } else if default.ends_with("::text") {
+                default.replace("::text", "")
+            } else {
+                default
+            };
+            col_def.push_str(&format!(" default {}", cleaned_default));
+        }
+
+        column_definitions.push(col_def);
+    }
+
+    // Query for constraints
+    let constraint_query = "
+        SELECT
+            tc.constraint_name,
+            tc.constraint_type,
+            string_agg(kcu.column_name, ', ' ORDER BY kcu.ordinal_position) as columns,
+            ccu.table_name as foreign_table,
+            string_agg(ccu.column_name, ', ' ORDER BY kcu.ordinal_position) as foreign_columns,
+            rc.update_rule,
+            rc.delete_rule,
+            cc.check_clause
+        FROM information_schema.table_constraints tc
+        LEFT JOIN information_schema.key_column_usage kcu
+            ON tc.constraint_name = kcu.constraint_name
+            AND tc.table_schema = kcu.table_schema
+        LEFT JOIN information_schema.constraint_column_usage ccu
+            ON ccu.constraint_name = tc.constraint_name
+            AND ccu.constraint_schema = tc.constraint_schema
+            AND ccu.table_name != tc.table_name
+        LEFT JOIN information_schema.referential_constraints rc
+            ON rc.constraint_name = tc.constraint_name
+            AND rc.constraint_schema = tc.constraint_schema
+        LEFT JOIN information_schema.check_constraints cc
+            ON cc.constraint_name = tc.constraint_name
+            AND cc.constraint_schema = tc.constraint_schema
+        WHERE tc.table_schema = COALESCE($2, 'public')
+            AND tc.table_name = $1
+        GROUP BY tc.constraint_name, tc.constraint_type, ccu.table_name, rc.update_rule, rc.delete_rule, cc.check_clause
+        ORDER BY
+            CASE tc.constraint_type
+                WHEN 'PRIMARY KEY' THEN 1
+                WHEN 'UNIQUE' THEN 2
+                WHEN 'CHECK' THEN 3
+                WHEN 'FOREIGN KEY' THEN 4
+                ELSE 5
+            END
+    ";
+
+    let constraint_rows = client.query(constraint_query, &[&table_name, &schema_name.as_ref().unwrap_or(&"public".to_string())]).await
+        .map_err(|e| format!("Constraint query failed: {}", e))?;
+
+    let mut constraints = Vec::new();
+
+    for row in constraint_rows {
+        let constraint_name: String = row.get(0);
+        let constraint_type: String = row.get(1);
+        let columns: Option<String> = row.get(2);
+        let foreign_table: Option<String> = row.get(3);
+        let foreign_columns: Option<String> = row.get(4);
+        let _update_rule: Option<String> = row.get(5);
+        let _delete_rule: Option<String> = row.get(6);
+        let check_clause: Option<String> = row.get(7);
+
+        match constraint_type.as_str() {
+            "PRIMARY KEY" => {
+                if let Some(cols) = columns {
+                    constraints.push(format!("  constraint {} primary key ({})", constraint_name, cols));
+                }
+            },
+            "UNIQUE" => {
+                if let Some(cols) = columns {
+                    constraints.push(format!("  constraint {} unique ({})", constraint_name, cols));
+                }
+            },
+            "CHECK" => {
+                if let Some(clause) = check_clause {
+                    constraints.push(format!("  constraint {} check {}", constraint_name, clause));
+                }
+            },
+            "FOREIGN KEY" => {
+                if let (Some(cols), Some(ftable), Some(fcols)) = (columns, foreign_table, foreign_columns) {
+                    constraints.push(format!("  constraint {} foreign key ({}) references {} ({})",
+                        constraint_name, cols, ftable, fcols));
+                }
+            },
+            _ => {}
+        }
+    }
+
+    // Combine everything into CREATE TABLE statement
+    let mut create_statement = format!("create table {}{} (\n", schema_prefix, table_name);
+
+    let mut all_definitions = column_definitions;
+    all_definitions.extend(constraints);
+
+    create_statement.push_str(&all_definitions.join(",\n"));
+    create_statement.push_str("\n) TABLESPACE pg_default;");
+
+    Ok(create_statement)
+}
+
+#[tauri::command]
 async fn update_last_connected(app: tauri::AppHandle, id: String) -> Result<(), String> {
     use tauri_plugin_store::StoreExt;
     
@@ -1412,6 +1675,7 @@ pub fn run() {
             update_last_connected,
             get_database_schema,
             get_table_columns,
+            get_table_create_statement,
             save_window_state,
             restore_window_state,
             export_query_stream,

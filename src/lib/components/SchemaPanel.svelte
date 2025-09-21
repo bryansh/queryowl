@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { invoke } from '@tauri-apps/api/core';
-	import { Database, Table, Eye, ChevronDown, ChevronRight, Columns, Hash, Type, Key, Zap, Settings, Link, Shield, FileText, Package, Folder, Layers } from 'lucide-svelte';
+	import { Database, Table, Eye, ChevronDown, ChevronRight, Columns, Hash, Type, Key, Zap, Settings, Link, Shield, FileText, Package, Folder, Layers, Copy, Check } from 'lucide-svelte';
 	import type { DatabaseConnection } from '$lib/types/database';
 	
 	let { 
@@ -108,7 +108,8 @@
 	let expandedTables = $state<Set<string>>(new Set());
 	let tableColumns = $state<Record<string, SchemaColumn[]>>({});
 	let loadingColumns = $state<Set<string>>(new Set());
-	
+	let copiedTables = $state<Set<string>>(new Set());
+
 	// Section collapse states - all expanded by default
 	let expandedSections = $state<Set<string>>(new Set([
 		'tables', 'views', 'materialized_views', 'indexes', 
@@ -216,6 +217,36 @@
 		}
 		return Columns;
 	}
+
+	async function copyTableSchema(tableName: string, event: MouseEvent) {
+		event.stopPropagation();
+		if (!activeConnection) return;
+
+		try {
+			const createStatement = await invoke<string>('get_table_create_statement', {
+				connectionId: activeConnection.id,
+				tableName,
+				schemaName: null // Using default public schema
+			});
+
+			// Use Tauri's clipboard API
+			await invoke('plugin:clipboard-manager|write_text', {
+				text: createStatement
+			});
+
+			// Show feedback
+			copiedTables.add(tableName);
+			copiedTables = new Set(copiedTables);
+
+			// Reset after 2 seconds
+			setTimeout(() => {
+				copiedTables.delete(tableName);
+				copiedTables = new Set(copiedTables);
+			}, 2000);
+		} catch (err) {
+			console.error(`Failed to copy schema for ${tableName}:`, err);
+		}
+	}
 </script>
 
 <div class="schema-panel h-full flex flex-col bg-surface-50-950 border-r border-surface-300-600">
@@ -280,6 +311,17 @@
 								<span class="text-xs text-surface-500 opacity-0 group-hover:opacity-100 transition-opacity">
 									{table.column_count}
 								</span>
+								<button
+									onclick={(event) => copyTableSchema(table.table_name, event)}
+									class="opacity-0 group-hover:opacity-100 hover:bg-surface-300-600 rounded p-0.5 transition-all duration-200 {copiedTables.has(table.table_name) ? '!opacity-100 !bg-green-500/20' : ''}"
+									title="{copiedTables.has(table.table_name) ? 'Copied!' : 'Copy CREATE TABLE statement'}"
+								>
+									{#if copiedTables.has(table.table_name)}
+										<Check class="h-3 w-3 text-green-400 animate-scale-in" />
+									{:else}
+										<Copy class="h-3 w-3" />
+									{/if}
+								</button>
 								<button
 									onclick={(e) => { e.stopPropagation(); handleTableClick(table.table_name); }}
 									class="opacity-0 group-hover:opacity-100 hover:bg-surface-300-600 rounded p-0.5 transition-opacity"
@@ -364,6 +406,17 @@
 								<span class="text-xs text-surface-500 opacity-0 group-hover:opacity-100 transition-opacity">
 									{view.column_count}
 								</span>
+								<button
+									onclick={(event) => copyTableSchema(view.table_name, event)}
+									class="opacity-0 group-hover:opacity-100 hover:bg-surface-300-600 rounded p-0.5 transition-all duration-200 {copiedTables.has(view.table_name) ? '!opacity-100 !bg-green-500/20' : ''}"
+									title="{copiedTables.has(view.table_name) ? 'Copied!' : 'Copy CREATE VIEW statement'}"
+								>
+									{#if copiedTables.has(view.table_name)}
+										<Check class="h-3 w-3 text-green-400 animate-scale-in" />
+									{:else}
+										<Copy class="h-3 w-3" />
+									{/if}
+								</button>
 								<button
 									onclick={(e) => { e.stopPropagation(); handleTableClick(view.table_name); }}
 									class="opacity-0 group-hover:opacity-100 hover:bg-surface-300-600 rounded p-0.5 transition-opacity"
@@ -696,5 +749,18 @@
 		min-width: 250px;
 		max-width: 400px;
 		width: 280px;
+	}
+
+	@keyframes scale-in {
+		from {
+			transform: scale(0);
+		}
+		to {
+			transform: scale(1);
+		}
+	}
+
+	:global(.animate-scale-in) {
+		animation: scale-in 0.2s ease-out;
 	}
 </style>
