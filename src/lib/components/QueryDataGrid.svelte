@@ -142,7 +142,7 @@
 	{:else if data && data.length > 0}
 		<!-- Check if this is a success message for DDL/DML queries -->
 		{#if data.length === 1 && data[0].status === 'success'}
-			<div class="flex-1 flex items-center justify-center text-primary-400">
+			<div class="flex-1 flex items-center justify-center text-primary-400 p-8">
 				<div class="text-center">
 					<CheckCircle class="h-16 w-16 mx-auto mb-4 text-primary-500" />
 					<p class="text-xl font-medium">{data[0].query_type} Query Executed Successfully</p>
