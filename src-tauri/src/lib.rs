@@ -439,11 +439,25 @@ async fn execute_query(app: tauri::AppHandle, connection_id: String, sql: String
     });
     
     // Detect if this is a SELECT query or a DDL/DML statement
-    let sql_trimmed = sql.trim().to_uppercase();
-    let is_select = sql_trimmed.starts_with("SELECT") || 
-                   sql_trimmed.starts_with("WITH") ||
-                   sql_trimmed.starts_with("SHOW") ||
-                   sql_trimmed.starts_with("EXPLAIN");
+    // Remove comments and extra whitespace first
+    let sql_cleaned = sql.lines()
+        .map(|line| {
+            // Remove single-line comments (-- comment)
+            if let Some(pos) = line.find("--") {
+                &line[..pos]
+            } else {
+                line
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim()
+        .to_uppercase();
+
+    let is_select = sql_cleaned.starts_with("SELECT") ||
+                   sql_cleaned.starts_with("WITH") ||
+                   sql_cleaned.starts_with("SHOW") ||
+                   sql_cleaned.starts_with("EXPLAIN");
     
     let result_limit = limit.unwrap_or(1000); // Default limit of 1000 rows
     let mut results = Vec::new();
@@ -509,19 +523,19 @@ async fn execute_query(app: tauri::AppHandle, connection_id: String, sql: String
         success_map.insert("affected_rows".to_string(), serde_json::Value::Number(affected_rows.into()));
         
         // Determine query type for better messaging
-        let query_type = if sql_trimmed.starts_with("CREATE") {
+        let query_type = if sql_cleaned.starts_with("CREATE") {
             "CREATE"
-        } else if sql_trimmed.starts_with("DROP") {
+        } else if sql_cleaned.starts_with("DROP") {
             "DROP"
-        } else if sql_trimmed.starts_with("ALTER") {
+        } else if sql_cleaned.starts_with("ALTER") {
             "ALTER"
-        } else if sql_trimmed.starts_with("INSERT") {
+        } else if sql_cleaned.starts_with("INSERT") {
             "INSERT"
-        } else if sql_trimmed.starts_with("UPDATE") {
+        } else if sql_cleaned.starts_with("UPDATE") {
             "UPDATE"
-        } else if sql_trimmed.starts_with("DELETE") {
+        } else if sql_cleaned.starts_with("DELETE") {
             "DELETE"
-        } else if sql_trimmed.starts_with("TRUNCATE") {
+        } else if sql_cleaned.starts_with("TRUNCATE") {
             "TRUNCATE"
         } else {
             "DDL/DML"
