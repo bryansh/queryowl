@@ -27,4 +27,22 @@ body {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
+  /* Prevent text selection for app-like feel */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Allow text selection only in specific areas where it makes sense */
+.monaco-editor,
+.monaco-editor *,
+input,
+textarea,
+.selectable,
+.query-results table,
+.query-results td,
+.query-results th,
+pre,
+code {
+  -webkit-user-select: text !important;
+  user-select: text !important;
 }
