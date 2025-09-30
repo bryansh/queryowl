@@ -3387,6 +3387,7 @@ dependencies = [
  "postgres-protocol",
  "serde",
  "serde_json",
+ "uuid",
 ]
 
 [[package]]
@@ -3514,6 +3515,7 @@ dependencies = [
  "chrono",
  "futures",
  "ring",
+ "rust_decimal",
  "serde",
  "serde_json",
  "tauri",
@@ -3959,6 +3961,7 @@ dependencies = [
  "borsh",
  "bytes",
  "num-traits",
+ "postgres-types",
  "rand 0.8.5",
  "rkyv",
  "serde",

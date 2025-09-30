@@ -267,9 +267,9 @@
 				sql: sql.trim(),
 				limit: 1000 // Default limit
 			});
-			
+
 			tab.executionTime = Math.round(performance.now() - startTime);
-			
+
 			// Handle new response structure
 			if (response.results) {
 				tab.results = response.results;

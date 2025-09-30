@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use std::collections::HashMap;
 use uuid::Uuid;
+use rust_decimal::Decimal;
 
 mod encryption;
 
@@ -484,17 +485,38 @@ async fn execute_query(app: tauri::AppHandle, connection_id: String, sql: String
         // Convert rows to JSON - simplified approach
         for row in limited_rows {
             let mut row_map = serde_json::Map::new();
-            
+
             for (i, column) in row.columns().iter().enumerate() {
                 let column_name = column.name();
-                
+
                 // Try to get the value as different types, falling back to string
                 let value = if let Ok(v) = row.try_get::<_, Option<bool>>(i) {
                     v.map(serde_json::Value::Bool).unwrap_or(serde_json::Value::Null)
+                } else if let Ok(v) = row.try_get::<_, Option<i16>>(i) {
+                    v.map(|n| serde_json::Value::Number(n.into())).unwrap_or(serde_json::Value::Null)
                 } else if let Ok(v) = row.try_get::<_, Option<i32>>(i) {
                     v.map(|n| serde_json::Value::Number(n.into())).unwrap_or(serde_json::Value::Null)
                 } else if let Ok(v) = row.try_get::<_, Option<i64>>(i) {
                     v.map(|n| serde_json::Value::Number(n.into())).unwrap_or(serde_json::Value::Null)
+                } else if let Ok(v) = row.try_get::<_, Option<Decimal>>(i) {
+                    // Handle PostgreSQL NUMERIC/DECIMAL types
+                    match v {
+                        Some(d) => {
+                            // Convert Decimal to string and then parse as serde_json::Number
+                            let d_str = d.to_string();
+                            if let Ok(num) = d_str.parse::<serde_json::Number>() {
+                                serde_json::Value::Number(num)
+                            } else {
+                                // If parsing fails, return as string
+                                serde_json::Value::String(d_str)
+                            }
+                        },
+                        None => serde_json::Value::Null
+                    }
+                } else if let Ok(v) = row.try_get::<_, Option<f32>>(i) {
+                    v.and_then(|n| serde_json::Number::from_f64(n as f64))
+                     .map(serde_json::Value::Number)
+                     .unwrap_or(serde_json::Value::Null)
                 } else if let Ok(v) = row.try_get::<_, Option<f64>>(i) {
                     v.and_then(|n| serde_json::Number::from_f64(n))
                      .map(serde_json::Value::Number)
@@ -502,13 +524,13 @@ async fn execute_query(app: tauri::AppHandle, connection_id: String, sql: String
                 } else if let Ok(v) = row.try_get::<_, Option<String>>(i) {
                     v.map(serde_json::Value::String).unwrap_or(serde_json::Value::Null)
                 } else {
-                    // For any other type, fallback to null (we can enhance this later)
+                    // For any other type, fallback to null
                     serde_json::Value::Null
                 };
-                
+
                 row_map.insert(column_name.to_string(), value);
             }
-            
+
             results.push(serde_json::Value::Object(row_map));
         }
     } else {

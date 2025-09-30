@@ -22,12 +22,14 @@
 	// Transform data for SVAR Grid format with value formatting
 	let gridData = $derived.by(() => {
 		if (!data || data.length === 0) return [];
+
 		return data.map((row, index) => {
 			const formattedRow: any = { id: index + 1 };
-			
+
 			Object.entries(row).forEach(([key, value]) => {
 				if (value === null || value === undefined) {
-					formattedRow[key] = 'NULL';
+					// Display NULL with special marker for visibility
+					formattedRow[key] = 'null';
 				} else if (typeof value === 'boolean') {
 					formattedRow[key] = value ? '✓' : '✗';
 				} else if (typeof value === 'object') {
@@ -38,7 +40,7 @@
 					formattedRow[key] = value;
 				}
 			});
-			
+
 			return formattedRow;
 		});
 	});
@@ -46,7 +48,7 @@
 	// Generate columns from data - simplified approach
 	let columns = $derived.by(() => {
 		if (!data || data.length === 0) return [];
-		
+
 		const firstRow = data[0];
 		return Object.keys(firstRow).map(key => ({
 			id: key,
