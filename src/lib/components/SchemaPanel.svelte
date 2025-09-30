@@ -14,6 +14,7 @@
 	
 	interface SchemaTable {
 		table_name: string;
+		table_schema: string;
 		table_type: string;
 		column_count: number;
 	}
@@ -105,6 +106,7 @@
 	let schema: DatabaseSchema | null = $state(null);
 	let loading = $state(false);
 	let error = $state<string | null>(null);
+	let expandedSchemas = $state<Set<string>>(new Set(['public'])); // Expand 'public' by default
 	let expandedTables = $state<Set<string>>(new Set());
 	let tableColumns = $state<Record<string, SchemaColumn[]>>({});
 	let loadingColumns = $state<Set<string>>(new Set());
@@ -192,10 +194,24 @@
 		}
 	}
 	
-	function handleTableClick(tableName: string) {
+	function handleTableClick(tableName: string, schemaName?: string) {
 		if (onTableSelect) {
-			onTableSelect(tableName);
+			// If schema is provided and not 'public', use schema-qualified name
+			if (schemaName && schemaName !== 'public') {
+				onTableSelect(`${schemaName}.${tableName}`);
+			} else {
+				onTableSelect(tableName);
+			}
 		}
+	}
+
+	function toggleSchema(schemaName: string) {
+		if (expandedSchemas.has(schemaName)) {
+			expandedSchemas.delete(schemaName);
+		} else {
+			expandedSchemas.add(schemaName);
+		}
+		expandedSchemas = new Set(expandedSchemas);
 	}
 	
 	function toggleSection(section: string) {
@@ -216,6 +232,19 @@
 			return Type;
 		}
 		return Columns;
+	}
+
+	// Group tables by schema
+	function groupBySchema(tables: SchemaTable[]): Map<string, SchemaTable[]> {
+		const grouped = new Map<string, SchemaTable[]>();
+		for (const table of tables) {
+			const schemaName = table.table_schema;
+			if (!grouped.has(schemaName)) {
+				grouped.set(schemaName, []);
+			}
+			grouped.get(schemaName)!.push(table);
+		}
+		return grouped;
 	}
 
 	async function copyTableSchema(tableName: string, event: MouseEvent) {
@@ -277,8 +306,9 @@
 				</button>
 			</div>
 		{:else if schema}
-			<!-- Tables Section -->
+			<!-- Tables Section (Grouped by Schema) -->
 			{#if schema.tables.length > 0}
+				{@const tablesBySchema = groupBySchema(schema.tables)}
 				<div class="mb-4">
 					<button
 						onclick={() => toggleSection('tables')}
@@ -293,81 +323,102 @@
 						<span>Tables ({schema.tables.length})</span>
 					</button>
 					{#if expandedSections.has('tables')}
-						{#each schema.tables as table (table.table_name)}
-						<div class="ml-1">
-							<div class="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-surface-300 hover:bg-surface-200-700 rounded transition-colors group">
+						{#each Array.from(tablesBySchema.entries()) as [schemaName, tables]}
+							<!-- Schema group -->
+							<div class="ml-1 mt-1">
 								<button
-									onclick={() => toggleTable(table.table_name)}
-									class="flex items-center gap-2 flex-1"
+									onclick={() => toggleSchema(schemaName)}
+									class="w-full flex items-center gap-2 px-2 py-1 text-xs font-medium text-surface-300 hover:bg-surface-200-700 rounded transition-colors"
 								>
-									{#if expandedTables.has(table.table_name)}
-										<ChevronDown class="h-3 w-3 text-surface-500" />
+									{#if expandedSchemas.has(schemaName)}
+										<ChevronDown class="h-3 w-3" />
 									{:else}
-										<ChevronRight class="h-3 w-3 text-surface-500" />
+										<ChevronRight class="h-3 w-3" />
 									{/if}
-									<Table class="h-3 w-3 text-blue-400" />
-									<span class="flex-1 text-left truncate">{table.table_name}</span>
+									<Folder class="h-3 w-3 text-amber-400" />
+									<span>{schemaName}</span>
+									<span class="ml-auto text-surface-500">({tables.length})</span>
 								</button>
-								<span class="text-xs text-surface-500 opacity-0 group-hover:opacity-100 transition-opacity">
-									{table.column_count}
-								</span>
-								<button
-									onclick={(event) => copyTableSchema(table.table_name, event)}
-									class="opacity-0 group-hover:opacity-100 hover:bg-surface-300-600 rounded p-0.5 transition-all duration-200 {copiedTables.has(table.table_name) ? '!opacity-100 !bg-green-500/20' : ''}"
-									title="{copiedTables.has(table.table_name) ? 'Copied!' : 'Copy CREATE TABLE statement'}"
-								>
-									{#if copiedTables.has(table.table_name)}
-										<Check class="h-3 w-3 text-green-400 animate-scale-in" />
-									{:else}
-										<Copy class="h-3 w-3" />
-									{/if}
-								</button>
-								<button
-									onclick={(e) => { e.stopPropagation(); handleTableClick(table.table_name); }}
-									class="opacity-0 group-hover:opacity-100 hover:bg-surface-300-600 rounded p-0.5 transition-opacity"
-									title="Insert table name"
-								>
-									<svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-									</svg>
-								</button>
-							</div>
-							
-							<!-- Columns -->
-							{#if expandedTables.has(table.table_name)}
-								<div class="ml-6 mt-1 space-y-0.5">
-									{#if loadingColumns.has(table.table_name)}
-										<div class="flex items-center gap-2 px-2 py-1 text-xs text-surface-500">
-											<div class="animate-spin w-3 h-3 border border-primary-500 border-t-transparent rounded-full"></div>
-											<span>Loading columns...</span>
-										</div>
-									{:else if tableColumns[table.table_name]}
-										{#each tableColumns[table.table_name] as column (column.column_name)}
-											<div class="flex items-center gap-2 px-2 py-1 text-xs text-surface-400 hover:bg-surface-200-700 rounded group">
-												<svelte:component this={getColumnIcon(column.data_type)} class="h-3 w-3 text-surface-500" />
-												<span class="font-mono text-surface-300">{column.column_name}</span>
-												<span class="text-surface-500">{column.data_type}</span>
-												{#if column.is_primary_key}
-													<Key class="h-2.5 w-2.5 text-yellow-500" title="Primary key" />
-												{:else if column.is_nullable === 'NO'}
-													<Shield class="h-2.5 w-2.5 text-amber-500" title="Not null" />
-												{/if}
+
+								{#if expandedSchemas.has(schemaName)}
+									{#each tables as table (`${table.table_schema}.${table.table_name}`)}
+										<div class="ml-3">
+											<div class="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-surface-300 hover:bg-surface-200-700 rounded transition-colors group">
 												<button
-													onclick={() => handleTableClick(`${table.table_name}.${column.column_name}`)}
-													class="opacity-0 group-hover:opacity-100 hover:bg-surface-300-600 rounded p-0.5 transition-opacity ml-auto"
-													title="Insert column name"
+													onclick={() => toggleTable(table.table_name)}
+													class="flex items-center gap-2 flex-1"
 												>
-													<svg class="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													{#if expandedTables.has(table.table_name)}
+														<ChevronDown class="h-3 w-3 text-surface-500" />
+													{:else}
+														<ChevronRight class="h-3 w-3 text-surface-500" />
+													{/if}
+													<Table class="h-3 w-3 text-blue-400" />
+													<span class="flex-1 text-left truncate">{table.table_name}</span>
+												</button>
+												<span class="text-xs text-surface-500 opacity-0 group-hover:opacity-100 transition-opacity">
+													{table.column_count}
+												</span>
+												<button
+													onclick={(event) => copyTableSchema(table.table_name, event)}
+													class="opacity-0 group-hover:opacity-100 hover:bg-surface-300-600 rounded p-0.5 transition-all duration-200 {copiedTables.has(table.table_name) ? '!opacity-100 !bg-green-500/20' : ''}"
+													title="{copiedTables.has(table.table_name) ? 'Copied!' : 'Copy CREATE TABLE statement'}"
+												>
+													{#if copiedTables.has(table.table_name)}
+														<Check class="h-3 w-3 text-green-400 animate-scale-in" />
+													{:else}
+														<Copy class="h-3 w-3" />
+													{/if}
+												</button>
+												<button
+													onclick={(e) => { e.stopPropagation(); handleTableClick(table.table_name, table.table_schema); }}
+													class="opacity-0 group-hover:opacity-100 hover:bg-surface-300-600 rounded p-0.5 transition-opacity"
+													title="Insert table name"
+												>
+													<svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 														<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
 													</svg>
 												</button>
 											</div>
-										{/each}
-									{/if}
-								</div>
-							{/if}
-						</div>
-					{/each}
+
+											<!-- Columns -->
+											{#if expandedTables.has(table.table_name)}
+												<div class="ml-6 mt-1 space-y-0.5">
+													{#if loadingColumns.has(table.table_name)}
+														<div class="flex items-center gap-2 px-2 py-1 text-xs text-surface-500">
+															<div class="animate-spin w-3 h-3 border border-primary-500 border-t-transparent rounded-full"></div>
+															<span>Loading columns...</span>
+														</div>
+													{:else if tableColumns[table.table_name]}
+														{#each tableColumns[table.table_name] as column (column.column_name)}
+															<div class="flex items-center gap-2 px-2 py-1 text-xs text-surface-400 hover:bg-surface-200-700 rounded group">
+																<svelte:component this={getColumnIcon(column.data_type)} class="h-3 w-3 text-surface-500" />
+																<span class="font-mono text-surface-300">{column.column_name}</span>
+																<span class="text-surface-500">{column.data_type}</span>
+																{#if column.is_primary_key}
+																	<Key class="h-2.5 w-2.5 text-yellow-500" title="Primary key" />
+																{:else if column.is_nullable === 'NO'}
+																	<Shield class="h-2.5 w-2.5 text-amber-500" title="Not null" />
+																{/if}
+																<button
+																	onclick={() => handleTableClick(`${table.table_name}.${column.column_name}`, table.table_schema)}
+																	class="opacity-0 group-hover:opacity-100 hover:bg-surface-300-600 rounded p-0.5 transition-opacity ml-auto"
+																	title="Insert column name"
+																>
+																	<svg class="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+																		<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+																	</svg>
+																</button>
+															</div>
+														{/each}
+													{/if}
+												</div>
+											{/if}
+										</div>
+									{/each}
+								{/if}
+							</div>
+						{/each}
 					{/if}
 				</div>
 			{/if}
@@ -418,7 +469,7 @@
 									{/if}
 								</button>
 								<button
-									onclick={(e) => { e.stopPropagation(); handleTableClick(view.table_name); }}
+									onclick={(e) => { e.stopPropagation(); handleTableClick(view.table_name, view.table_schema); }}
 									class="opacity-0 group-hover:opacity-100 hover:bg-surface-300-600 rounded p-0.5 transition-opacity"
 									title="Insert view name"
 								>
@@ -448,7 +499,7 @@
 													<Shield class="h-2.5 w-2.5 text-amber-500" title="Not null" />
 												{/if}
 												<button
-													onclick={() => handleTableClick(`${view.table_name}.${column.column_name}`)}
+													onclick={() => handleTableClick(`${view.table_name}.${column.column_name}`, view.table_schema)}
 													class="opacity-0 group-hover:opacity-100 hover:bg-surface-300-600 rounded p-0.5 transition-opacity ml-auto"
 													title="Insert column name"
 												>

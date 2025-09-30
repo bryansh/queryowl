@@ -835,6 +835,7 @@ async fn disconnect_from_database() -> Result<(), String> {
 #[derive(Debug, Serialize)]
 struct SchemaTable {
     table_name: String,
+    table_schema: String,
     table_type: String,
     column_count: i64,
 }
@@ -1005,32 +1006,35 @@ async fn get_database_schema(app: tauri::AppHandle, connection_id: String) -> Re
 
     // 1. Query for tables, views, and materialized views
     let table_query = "
-        SELECT 
+        SELECT
             t.table_name,
+            t.table_schema,
             t.table_type,
             COUNT(c.column_name) as column_count
         FROM information_schema.tables t
-        LEFT JOIN information_schema.columns c ON t.table_name = c.table_name 
+        LEFT JOIN information_schema.columns c ON t.table_name = c.table_name
             AND t.table_schema = c.table_schema
         WHERE t.table_schema NOT IN ('information_schema', 'pg_catalog')
-        GROUP BY t.table_name, t.table_type
-        ORDER BY t.table_type, t.table_name
+        GROUP BY t.table_name, t.table_schema, t.table_type
+        ORDER BY t.table_schema, t.table_type, t.table_name
     ";
-    
+
     let rows = client.query(table_query, &[]).await
         .map_err(|e| format!("Schema query failed: {}", e))?;
-    
+
     for row in rows {
         let table_name: String = row.get(0);
-        let table_type: String = row.get(1);
-        let column_count: i64 = row.get(2);
-        
+        let table_schema: String = row.get(1);
+        let table_type: String = row.get(2);
+        let column_count: i64 = row.get(3);
+
         let schema_table = SchemaTable {
             table_name,
+            table_schema: table_schema.clone(),
             table_type: table_type.clone(),
             column_count,
         };
-        
+
         match table_type.as_str() {
             "BASE TABLE" => tables.push(schema_table),
             "VIEW" => views.push(schema_table),
@@ -1103,10 +1107,28 @@ async fn get_database_schema(app: tauri::AppHandle, connection_id: String) -> Re
         });
     }
 
-    // For now, let's comment out the complex queries to isolate the issue
-    // We'll just return tables and views first to see if those work
-    
-    // TODO: Add back other entity types once basic loading works
+    // Query for schemas (list all non-system schemas)
+    let schemas_query = "
+        SELECT
+            schema_name,
+            schema_owner as owner
+        FROM information_schema.schemata
+        WHERE schema_name NOT IN ('information_schema', 'pg_catalog', 'pg_toast')
+        ORDER BY schema_name
+    ";
+
+    let rows = client.query(schemas_query, &[]).await
+        .map_err(|e| format!("Schemas query failed: {}", e))?;
+
+    for row in rows {
+        let schema_name: String = row.get(0);
+        let owner: String = row.get(1);
+
+        schemas.push(SchemaSchema {
+            schema_name,
+            owner,
+        });
+    }
 
     Ok(DatabaseSchema {
         tables,

@@ -121,37 +121,88 @@
 					
 					// Add database schema suggestions if available
 					if (schema) {
-						// Add tables
+						// Add tables (both qualified and unqualified names)
 						if (schema.tables) {
-							suggestions.push(...schema.tables.map((table: any) => ({
-								label: table.table_name,
-								kind: monaco.languages.CompletionItemKind.Class,
-								insertText: table.table_name,
-								detail: `Table (${table.column_count} columns)`,
-								documentation: `Base table with ${table.column_count} columns`
-							})));
+							schema.tables.forEach((table: any) => {
+								const schemaLabel = table.table_schema ? ` [${table.table_schema}]` : '';
+
+								// Always add the unqualified table name
+								suggestions.push({
+									label: table.table_name,
+									kind: monaco.languages.CompletionItemKind.Class,
+									insertText: table.table_name,
+									detail: `Table${schemaLabel} (${table.column_count} columns)`,
+									documentation: `Base table with ${table.column_count} columns${table.table_schema ? ` in schema ${table.table_schema}` : ''}`
+								});
+
+								// For non-public schemas, also add the fully-qualified name
+								if (table.table_schema && table.table_schema !== 'public') {
+									suggestions.push({
+										label: `${table.table_schema}.${table.table_name}`,
+										kind: monaco.languages.CompletionItemKind.Class,
+										insertText: `${table.table_schema}.${table.table_name}`,
+										detail: `Table [${table.table_schema}] (${table.column_count} columns)`,
+										documentation: `Fully-qualified: ${table.table_schema}.${table.table_name} - Base table with ${table.column_count} columns`,
+										sortText: `1_${table.table_schema}.${table.table_name}` // Sort qualified names first
+									});
+								}
+							});
 						}
-						
-						// Add views
+
+						// Add views (both qualified and unqualified names)
 						if (schema.views) {
-							suggestions.push(...schema.views.map((view: any) => ({
-								label: view.table_name,
-								kind: monaco.languages.CompletionItemKind.Interface,
-								insertText: view.table_name,
-								detail: `View (${view.column_count} columns)`,
-								documentation: `Database view with ${view.column_count} columns`
-							})));
+							schema.views.forEach((view: any) => {
+								const schemaLabel = view.table_schema ? ` [${view.table_schema}]` : '';
+
+								// Always add the unqualified view name
+								suggestions.push({
+									label: view.table_name,
+									kind: monaco.languages.CompletionItemKind.Interface,
+									insertText: view.table_name,
+									detail: `View${schemaLabel} (${view.column_count} columns)`,
+									documentation: `Database view with ${view.column_count} columns${view.table_schema ? ` in schema ${view.table_schema}` : ''}`
+								});
+
+								// For non-public schemas, also add the fully-qualified name
+								if (view.table_schema && view.table_schema !== 'public') {
+									suggestions.push({
+										label: `${view.table_schema}.${view.table_name}`,
+										kind: monaco.languages.CompletionItemKind.Interface,
+										insertText: `${view.table_schema}.${view.table_name}`,
+										detail: `View [${view.table_schema}] (${view.column_count} columns)`,
+										documentation: `Fully-qualified: ${view.table_schema}.${view.table_name} - Database view with ${view.column_count} columns`,
+										sortText: `1_${view.table_schema}.${view.table_name}` // Sort qualified names first
+									});
+								}
+							});
 						}
-						
-						// Add materialized views
+
+						// Add materialized views (both qualified and unqualified names)
 						if (schema.materialized_views) {
-							suggestions.push(...schema.materialized_views.map((mv: any) => ({
-								label: mv.table_name,
-								kind: monaco.languages.CompletionItemKind.Struct,
-								insertText: mv.table_name,
-								detail: `Materialized View (${mv.column_count} columns)`,
-								documentation: `Materialized view with ${mv.column_count} columns`
-							})));
+							schema.materialized_views.forEach((mv: any) => {
+								const schemaLabel = mv.table_schema ? ` [${mv.table_schema}]` : '';
+
+								// Always add the unqualified name
+								suggestions.push({
+									label: mv.table_name,
+									kind: monaco.languages.CompletionItemKind.Struct,
+									insertText: mv.table_name,
+									detail: `Materialized View${schemaLabel} (${mv.column_count} columns)`,
+									documentation: `Materialized view with ${mv.column_count} columns${mv.table_schema ? ` in schema ${mv.table_schema}` : ''}`
+								});
+
+								// For non-public schemas, also add the fully-qualified name
+								if (mv.table_schema && mv.table_schema !== 'public') {
+									suggestions.push({
+										label: `${mv.table_schema}.${mv.table_name}`,
+										kind: monaco.languages.CompletionItemKind.Struct,
+										insertText: `${mv.table_schema}.${mv.table_name}`,
+										detail: `Materialized View [${mv.table_schema}] (${mv.column_count} columns)`,
+										documentation: `Fully-qualified: ${mv.table_schema}.${mv.table_name} - Materialized view with ${mv.column_count} columns`,
+										sortText: `1_${mv.table_schema}.${mv.table_name}` // Sort qualified names first
+									});
+								}
+							});
 						}
 						
 						// Add functions
@@ -184,6 +235,17 @@
 								insertText: enumType.type_name,
 								detail: `Enum (${enumType.enum_values.length} values)`,
 								documentation: `Enum type: ${enumType.enum_values.join(', ')}`
+							})));
+						}
+
+						// Add schemas
+						if (schema.schemas) {
+							suggestions.push(...schema.schemas.map((schemaItem: any) => ({
+								label: schemaItem.schema_name,
+								kind: monaco.languages.CompletionItemKind.Module,
+								insertText: schemaItem.schema_name,
+								detail: `Schema (owner: ${schemaItem.owner})`,
+								documentation: `Database schema owned by ${schemaItem.owner}`
 							})));
 						}
 					}
