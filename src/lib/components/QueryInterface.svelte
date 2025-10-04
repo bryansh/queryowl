@@ -152,7 +152,19 @@
 			});
 		}
 		});
-	
+
+	// Notify parent when active tab changes or results are available
+	$effect(() => {
+		if (activeTab && onResultsChange) {
+			onResultsChange(
+				activeTab.results || [],
+				activeTab.error,
+				activeTab.executionTime,
+				activeTab.isExecuting
+			);
+		}
+	});
+
 	onMount(() => {
 		loadQueryHistory();
 		
