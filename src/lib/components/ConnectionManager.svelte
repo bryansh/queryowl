@@ -299,9 +299,11 @@
 	{#if !showForm}
 		<div class="space-y-4">
 			{#each $connections as connection (connection.id)}
-				<div 
-					class="card p-4 cursor-pointer hover:bg-surface-200-700/50 transition-colors" 
+				<div
+					class="card p-4 cursor-pointer transition-all duration-200"
 					style="border-left: 5px solid {connection.color || '#14b8a6'}; padding-left: calc(1rem - 5px);"
+					onmouseenter={(e) => e.currentTarget.style.backgroundColor = '#2a3544'}
+					onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
 					onclick={() => handleConnect(connection)}
 				>
 					<div class="flex items-center justify-between">
@@ -338,27 +340,27 @@
 							{/if}
 						</div>
 						<div class="flex items-center gap-2">
-							<button 
+							<button
+								onclick={(e) => { e.stopPropagation(); handleConnect(connection); }}
+								class="btn btn-sm btn-filled-primary"
+							>
+								Connect
+							</button>
+							<button
 								onclick={(e) => { e.stopPropagation(); handleTest(connection); }}
 								title="Test Connection"
 								class="btn btn-sm btn-ghost-surface"
 							>
 								<TestTube class="h-5 w-5" />
 							</button>
-							<button 
-								onclick={(e) => { e.stopPropagation(); handleConnect(connection); }}
-								class="btn btn-sm btn-filled-primary"
-							>
-								Connect
-							</button>
-							<button 
+							<button
 								onclick={(e) => { e.stopPropagation(); handleEdit(connection); }}
 								title="Edit Connection"
 								class="btn btn-sm btn-ghost-surface"
 							>
 								<Edit class="h-5 w-5" />
 							</button>
-							<button 
+							<button
 								onclick={(e) => { e.stopPropagation(); handleDelete(connection.id); }}
 								title="Delete Connection"
 								class="btn btn-sm btn-filled-error"
