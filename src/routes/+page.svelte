@@ -322,15 +322,15 @@
           <div class="flex items-center gap-2 text-xs">
             {#if currentView === "query" && queryResults && queryResults.length > 0 && !(queryResults.length === 1 && queryResults[0].status === 'success')}
               <!-- Copy and Export buttons - only show for actual tabular results -->
-              <button 
-                onclick={() => queryInterface?.copyResults()}
+              <button
+                onclick={(e) => { e.stopPropagation(); queryInterface?.copyResults(); }}
                 class="hover:bg-white/20 rounded px-2 py-1 transition-colors"
                 title="Copy results"
               >
                 Copy
               </button>
-              <button 
-                onclick={() => queryInterface?.exportResults()}
+              <button
+                onclick={(e) => { e.stopPropagation(); queryInterface?.exportResults(); }}
                 class="hover:bg-white/20 rounded px-2 py-1 transition-colors"
                 title="Export as CSV"
               >
