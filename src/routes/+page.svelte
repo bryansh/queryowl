@@ -4,7 +4,7 @@
   import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
   import { onMount } from "svelte";
   import { fade, slide } from 'svelte/transition';
-  import { Database, Settings, FileText, Menu, History, Table, Clock, Bookmark } from "lucide-svelte";
+  import { Database, Settings, FileText, Menu, History, Table, Clock, Bookmark, ChevronDown } from "lucide-svelte";
   import { Navigation } from '@skeletonlabs/skeleton-svelte';
   import ConnectionManager from "$lib/components/ConnectionManager.svelte";
   import ConnectionStatus from "$lib/components/ConnectionStatus.svelte";
@@ -22,12 +22,16 @@
   let isNavExpanded = $state(false);
   let showStatusMenu = $state(false);
   let queryInterface;
-  
+
   // Query results state for status bar
   let queryResults = $state(null);
   let queryError = $state(null);
   let executionTime = $state(null);
   let isExecuting = $state(false);
+
+  // Copy format state
+  let copyFormat = $state(localStorage.getItem('queryowl_copy_format') || 'tsv');
+  let showCopyFormatMenu = $state(false);
 
   onMount(async () => {
     // Restore window state on app launch
@@ -48,8 +52,11 @@
       if (showStatusMenu && !event.target.closest('.status-menu-container')) {
         showStatusMenu = false;
       }
+      if (showCopyFormatMenu && !event.target.closest('.copy-format-menu')) {
+        showCopyFormatMenu = false;
+      }
     };
-    
+
     document.addEventListener('click', handleClickOutside);
     
     // Save window state on window events
@@ -111,6 +118,18 @@
       showStatusMenu = false;
     } catch (error) {
       console.error('Failed to disconnect:', error);
+    }
+  }
+
+  function setCopyFormat(format) {
+    copyFormat = format;
+    localStorage.setItem('queryowl_copy_format', format);
+    showCopyFormatMenu = false;
+  }
+
+  function handleCopyResults() {
+    if (queryInterface) {
+      queryInterface.copyResults(copyFormat);
     }
   }
 
@@ -322,13 +341,46 @@
           <div class="flex items-center gap-2 text-xs">
             {#if currentView === "query" && queryResults && queryResults.length > 0 && !(queryResults.length === 1 && queryResults[0].status === 'success')}
               <!-- Copy and Export buttons - only show for actual tabular results -->
-              <button
-                onclick={(e) => { e.stopPropagation(); queryInterface?.copyResults(); }}
-                class="hover:bg-white/20 rounded px-2 py-1 transition-colors"
-                title="Copy results"
-              >
-                Copy
-              </button>
+              <div class="relative flex items-center copy-format-menu">
+                <button
+                  onclick={(e) => { e.stopPropagation(); handleCopyResults(); }}
+                  class="hover:bg-white/20 rounded-l px-2 py-1 transition-colors"
+                  title="Copy results as {copyFormat.toUpperCase()}"
+                >
+                  Copy ({copyFormat.toUpperCase()})
+                </button>
+                <button
+                  onclick={(e) => { e.stopPropagation(); showCopyFormatMenu = !showCopyFormatMenu; }}
+                  class="hover:bg-white/20 rounded-r px-1 py-1 transition-colors border-l border-white/20"
+                  title="Select copy format"
+                >
+                  <ChevronDown class="h-3 w-3" />
+                </button>
+                {#if showCopyFormatMenu}
+                  <div class="absolute bottom-full right-0 mb-2 bg-surface-100-900 border border-surface-300-600 rounded-lg shadow-lg z-50 min-w-[120px]">
+                    <div class="py-1">
+                      <button
+                        onclick={(e) => { e.stopPropagation(); setCopyFormat('tsv'); }}
+                        class="w-full px-3 py-1.5 text-left text-sm hover:bg-surface-200-700 transition-colors {copyFormat === 'tsv' ? 'bg-surface-200-700' : ''}"
+                      >
+                        TSV (Tab)
+                      </button>
+                      <button
+                        onclick={(e) => { e.stopPropagation(); setCopyFormat('csv'); }}
+                        class="w-full px-3 py-1.5 text-left text-sm hover:bg-surface-200-700 transition-colors {copyFormat === 'csv' ? 'bg-surface-200-700' : ''}"
+                      >
+                        CSV
+                      </button>
+                      <button
+                        onclick={(e) => { e.stopPropagation(); setCopyFormat('json'); }}
+                        class="w-full px-3 py-1.5 text-left text-sm hover:bg-surface-200-700 transition-colors {copyFormat === 'json' ? 'bg-surface-200-700' : ''}"
+                      >
+                        JSON
+                      </button>
+                    </div>
+                  </div>
+                {/if}
+              </div>
               <button
                 onclick={(e) => { e.stopPropagation(); queryInterface?.exportResults(); }}
                 class="hover:bg-white/20 rounded px-2 py-1 transition-colors"

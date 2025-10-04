@@ -399,20 +399,47 @@
 	let activeTab = $derived(tabs.find(t => t.id === activeTabId));
 	
 	// Export functions for status bar
-	export function copyResults() {
+	export function copyResults(format = 'tsv') {
 		if (activeTab && activeTab.results && activeTab.results.length > 0) {
-			const headers = Object.keys(activeTab.results[0]);
-			const rows = activeTab.results.map(row => 
-				headers.map(header => {
-					const value = row[header];
-					if (value === null) return 'NULL';
-					if (typeof value === 'object') return JSON.stringify(value);
-					return String(value);
-				}).join('\t')
-			);
-			
-			const tsvContent = [headers.join('\t'), ...rows].join('\n');
-			navigator.clipboard.writeText(tsvContent);
+			let content = '';
+
+			if (format === 'json') {
+				// JSON format
+				content = JSON.stringify(activeTab.results, null, 2);
+			} else if (format === 'csv') {
+				// CSV format
+				const headers = Object.keys(activeTab.results[0]);
+				const rows = activeTab.results.map(row =>
+					headers.map(header => {
+						const value = row[header];
+						let strValue;
+						if (value === null) strValue = 'NULL';
+						else if (typeof value === 'object') strValue = JSON.stringify(value);
+						else strValue = String(value);
+
+						// Escape CSV values
+						if (strValue.includes(',') || strValue.includes('"') || strValue.includes('\n')) {
+							return `"${strValue.replace(/"/g, '""')}"`;
+						}
+						return strValue;
+					}).join(',')
+				);
+				content = [headers.join(','), ...rows].join('\n');
+			} else {
+				// TSV format (default)
+				const headers = Object.keys(activeTab.results[0]);
+				const rows = activeTab.results.map(row =>
+					headers.map(header => {
+						const value = row[header];
+						if (value === null) return 'NULL';
+						if (typeof value === 'object') return JSON.stringify(value);
+						return String(value);
+					}).join('\t')
+				);
+				content = [headers.join('\t'), ...rows].join('\n');
+			}
+
+			navigator.clipboard.writeText(content);
 		}
 	}
 	

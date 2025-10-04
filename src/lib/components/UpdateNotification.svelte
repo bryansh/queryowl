@@ -112,7 +112,7 @@
 </script>
 
 {#if showNotification}
-  <div class="fixed top-4 right-4 z-50 max-w-sm card shadow-lg overflow-hidden">
+  <div class="fixed top-4 right-4 z-50 max-w-sm card shadow-lg overflow-hidden bg-surface-50-950 border border-surface-300-600">
     <div class="p-4">
       <div class="flex items-start justify-between">
         <div class="flex-1 mr-3">
