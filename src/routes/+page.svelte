@@ -125,6 +125,8 @@
     copyFormat = format;
     localStorage.setItem('queryowl_copy_format', format);
     showCopyFormatMenu = false;
+    // Automatically copy results in the new format
+    handleCopyResults();
   }
 
   function handleCopyResults() {
@@ -391,7 +393,6 @@
               <span class="mx-1">|</span>
             {/if}
             <span>{currentView === "query" && isExecuting ? "Executing" : "Ready"}</span>
-            <span class="ml-2">⌄</span>
           </div>
         </div>
         
@@ -399,9 +400,9 @@
         {#if showStatusMenu}
           <div class="absolute bottom-full right-0 mb-2 bg-surface-100-900 border border-surface-300-600 rounded-lg shadow-lg z-50 min-w-[200px]">
             <div class="py-2">
-              <button 
+              <button
                 onclick={handleDisconnect}
-                class="w-full px-4 py-2 text-left text-sm hover:bg-surface-200-700 transition-colors flex items-center gap-3"
+                class="w-full px-4 py-2 text-left text-sm hover:bg-red-900/30 transition-colors flex items-center gap-3 text-surface-200 hover:text-red-300"
               >
                 <span class="text-red-500">⏻</span>
                 Disconnect from {$activeConnection.name}
